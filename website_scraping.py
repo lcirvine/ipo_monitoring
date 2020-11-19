@@ -142,7 +142,6 @@ class WebDriver:
     def update_existing_data(old_df: pd.DataFrame, new_df: pd.DataFrame, exclude_col=None) -> pd.DataFrame:
         """
         If there is already existing data, this function can be called to remove any duplicates.
-        This function will remove any rows where all columns are the same except for time_checked
         :param old_df: DataFrame with existing data
         :param new_df: DataFrame with new data
         :param exclude_col: Column(s) that will be excluded when removing duplicate values in DataFrames.
