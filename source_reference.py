@@ -57,17 +57,17 @@ sources_dict = \
             ],
             'file': 'NYSE'
         },
-        'Nasdaq': {
+        'Nasdaq Upcoming': {
             'exchange': 'NASDAQ',
             'rank': 2,
             'location': 'New York',
             'url': 'https://www.nasdaq.com/market-activity/ipos?tab=upcoming',
             'table_num': 2,
             'table_elem': 'table',
-            'table_attrs': {'class': 'market-calendar-table__table'},
-            'row_elem': 'tr',
+            # 'table_attrs': {'class': 'market-calendar-table__body'},
+            # 'row_elem': 'tr',
             # 'row_attrs': {},
-            'cell_elem': 'td',
+            # 'cell_elem': 'td',
             # 'cell_attrs': {},
             'header_elem': 'th',
             'header_attrs': {'class': ['market-calendar-table__columnheader']},
@@ -82,7 +82,35 @@ sources_dict = \
                 'Date',
                 'Offer Amount'
             ],
-            'file': 'Nasdaq'
+            'file': 'Nasdaq Upcoming'
+        },
+        'Nasdaq Priced': {
+            'exchange': 'NASDAQ',
+            'rank': 2,
+            'location': 'New York',
+            'url': 'https://www.nasdaq.com/market-activity/ipos?tab=upcoming',
+            'table_num': 3,
+            'table_elem': 'table',
+            # 'table_attrs': {'class': 'market-calendar-table__body'},
+            # 'row_elem': 'tr',
+            # 'row_attrs': {},
+            # 'cell_elem': 'td',
+            # 'cell_attrs': {},
+            'header_elem': 'th',
+            'header_attrs': {'class': ['market-calendar-table__columnheader']},
+            # 'link_elem': '',
+            # 'link_key': '',
+            'columns': [
+                'Symbol',
+                'Company Name',
+                'Exchange/ Market',
+                'Price',
+                'Shares',
+                'Date',
+                'Offer Amount',
+                'Actions'
+            ],
+            'file': 'Nasdaq Priced'
         },
         'JPX': {
             'exchange': 'Japan Exchange Group',
@@ -128,23 +156,17 @@ sources_dict = \
             # 'link_elem': '',
             # 'link_key': '',
             'columns': [
-                'Code',
-                'Abbreviation',
-                'Total initial issuance (10,000 shares/10,000 shares)',
-                'Actual funds raised (ten thousand yuan)',
-                'Offline release date',
-                'Online release date',
-                'Issue price (yuan)',
-                'Total issuance (10,000 shares/10,000 shares)',
-                'Issuance P/E Ratio',
-                'Offline issuance (10,000 shares/10,000 shares)',
-                'Online issuance (10,000 shares/10,000 shares)',
-                'Online purchase limit (10,000 shares/10,000 shares)',
-                'Winning rate (%)',
-                'Announcement date of winning result',
-                'Listing date',
-                'Payment date',
-                'announcement'
+                'company name and code',
+                'purchase date',
+                'issue price',
+                'initial issuance and total issuance',
+                'actual funds raised',
+                'issuance P/E ratio',
+                'online and offline issuance',
+                'online purchase limit',
+                'winning rate (%)',
+                'announcement date of winning result',
+                'listing date'
             ],
             'file': 'Shanghai'
         },
@@ -192,14 +214,14 @@ sources_dict = \
             # 'link_key': '',
             'columns': [
                 'Blank',
-                'Code▼',
-                'Name▼',
+                    'Code▼',
+                'Name',
                 'Industry',
                 'Offer Price',
                 'Lot Size',
                 'Entry Fee',
                 'Offer Period',
-                'Listing Date▲'
+                'Listing Date'
             ],
             'file': 'AAStocks'
         },
@@ -387,7 +409,10 @@ sources_dict = \
                 'Name',
                 'Initial listing date',
                 'No. of Initial listed shr.(shr.)',
-                'Par Value(KRW)'
+                'Par Value(KRW)',
+                'Public Offering Price(KRW)',
+                'Industry',
+                'Lead Manager'
             ],
             'file': 'KRX'
         },

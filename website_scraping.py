@@ -42,9 +42,10 @@ class WebDriver:
         :param sleep_after: Bool for waiting after loading the URL
         :return: None
         """
-        self.driver.get(url)
-        if sleep_after:
-            time.sleep(self.sleep_time)
+        if url != self.driver.current_url:
+            self.driver.get(url)
+            if sleep_after:
+                time.sleep(self.sleep_time)
 
     def return_soup(self) -> BeautifulSoup:
         """
@@ -107,17 +108,18 @@ class WebDriver:
 
         soup = self.return_soup()
         if table_attrs is None:
-            table = soup.find(table_elem)
+            table = soup.find_all(table_elem)[table_num]
         else:
             table = soup.find(table_elem, attrs=table_attrs)
         assert table is not None, f'Unable to find {table_elem} with these attributes {table_attrs} on {url}'
         table_data = []
         for row in table.find_all(row_elem):
             cells = [c.text.strip() for c in row.find_all(cell_elem)]
+            # table_data.append(row.stripped_strings)
             if get_links and link_elem is not None and link_key is not None:
                 for link in row.find_all(link_elem):
                     cells.append(link[link_key])
-            if len(cells) > 1:
+            if len(cells) > 1 and (cells[1] != cols[1]):
                 table_data.append(cells)
         df = pd.DataFrame(table_data)
         if len(df) > 0:
@@ -148,7 +150,7 @@ class WebDriver:
                             Can be given either as a list of columns or a string with the column name.
         :return: DataFrame
         """
-        df = pd.concat([old_df, new_df], ignore_index=True)
+        df = pd.concat([old_df, new_df], ignore_index=True, sort=False)
         if exclude_col and isinstance(exclude_col, str):
             ss = [col for col in df.columns.to_list() if col != exclude_col]
         elif exclude_col and isinstance(exclude_col, list):
@@ -171,17 +173,18 @@ class WebDriver:
 
 
 def main():
-    wd = WebDriver()
+    wd = WebDriver(headless=False)
     for k, v in wd.sources_dict.items():
         try:
-            wd.load_url(v.get('url'), sleep_after=True)
+            wd.load_url(v.get('url'))  # , sleep_after=True)
             df = wd.parse_table(**v)
             if df is not None:
                 s_file = os.path.join(wd.source_data_folder, v.get('file') + '.csv')
                 if os.path.exists(s_file):
                     df = wd.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
+                df.sort_values(by='time_checked', ascending=False, inplace=True)
                 df.to_csv(s_file, index=False, encoding='utf-8-sig')
-            wd.webscraping_results.append([wd.time_checked_str, k, 1])
+                wd.webscraping_results.append([wd.time_checked_str, k, 1])
         except Exception as e:
             logger.error(f"ERROR for {k}")
             logger.error(e, exc_info=sys.exc_info())
