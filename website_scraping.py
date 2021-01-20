@@ -55,6 +55,22 @@ class WebDriver:
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         return soup
 
+    def page_data(self):
+        page_data_folder = os.path.join(os.getcwd(), 'Page Data')
+        if not os.path.exists(page_data_folder):
+            os.mkdir(page_data_folder)
+        for k, v in self.sources_dict.items():
+            try:
+                url = v.get('url')
+                if url != '':
+                    self.load_url(url)
+                    with open(os.path.join(page_data_folder, k + '.txt'), 'w') as f:
+                        f.write(self.driver.page_source)
+            except Exception as e:
+                print(k)
+                print(e)
+                pass
+
     def check_tables_in_sources(self, result_file: str = 'tables in sources') -> None:
         """
         This function is used for testing. It will create a JSON file with data about all the sites in the sources.ini
