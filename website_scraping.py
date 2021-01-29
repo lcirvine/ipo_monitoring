@@ -42,6 +42,7 @@ class WebDriver:
         :param sleep_after: Bool for waiting after loading the URL
         :return: None
         """
+        assert url is not None, f'No URL given'
         if url != self.driver.current_url:
             self.driver.get(url)
             if sleep_after:
@@ -173,10 +174,10 @@ class WebDriver:
 
 
 def main():
-    wd = WebDriver(headless=False)
+    wd = WebDriver()
     for k, v in wd.sources_dict.items():
         try:
-            wd.load_url(v.get('url'))  # , sleep_after=True)
+            wd.load_url(v.get('url'), sleep_after=True)
             df = wd.parse_table(**v)
             if df is not None:
                 s_file = os.path.join(wd.source_data_folder, v.get('file') + '.csv')
