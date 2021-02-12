@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 import pandas as pd
+import numpy as np
 
 
 class WebDriver:
@@ -147,6 +148,7 @@ class WebDriver:
             elif len(cols) > cols_in_row:
                 cols = cols[0:cols_in_row]
             df.columns = cols
+            df = df.replace(r'^\s*$', np.nan, regex=True)
             df.dropna(how='all', inplace=True)
             # Getting rid of rows that match the column headers in case headers have same element as rows
             c = df.columns[1]
