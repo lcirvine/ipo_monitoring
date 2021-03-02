@@ -92,7 +92,7 @@ sources_dict = \
             'rank': 2,
             'location': 'New York',
             'url': 'https://www.nasdaq.com/market-activity/ipos?tab=upcoming',
-            'table_num': 3,
+            'table_num': 2,
             'table_elem': 'tbody',
             # 'table_attrs': {'class': 'market-calendar-table__body'},
             'row_elem': 'tr',
@@ -119,7 +119,7 @@ sources_dict = \
             'rank': 2,
             'location': 'New York',
             'url': 'https://www.nasdaq.com/market-activity/ipos?tab=upcoming',
-            'table_num': 2,
+            'table_num': 3,
             'table_elem': 'tbody',
             # 'table_attrs': {'class': 'market-calendar-table__body'},
             'row_elem': 'tr',
@@ -740,6 +740,79 @@ sources_dict = \
             ],
             'file': 'TokyoIPO'
         },
+        'NasdaqNordic': {
+            'exchange': 'Multiple',
+            'rank': None,
+            'location': 'Multiple',  # ['Copenhagen', 'Helsinki', 'Iceland', 'Stockholm']
+            'url': 'http://www.nasdaqomxnordic.com/',
+            'table_num': 2,
+            'table_elem': 'table',
+            'table_attrs': {'id': 'latestListingsTable'},
+            'row_elem': 'tr',
+            # 'row_attrs': {},
+            'cell_elem': 'td',
+            # 'cell_attrs': {},
+            # 'header_elem': None,
+            # 'header_attrs': {},
+            # 'link_elem': '',
+            # 'link_key': '',
+            'columns': [
+                'Company Name',
+                'Last',
+                '%',
+                'IPO Date'
+            ],
+            'file': 'NasdaqNordic'
+        },
+        'Spotlight': {
+            'exchange': 'Spotlight',
+            'rank': None,
+            'location': 'Stockholm',
+            'url': 'https://spotlightstockmarket.com/en/market-overview/listings/',
+            'table_num': 1,
+            'table_elem': 'table',
+            'table_attrs': None,
+            'row_elem': 'tr',
+            # 'row_attrs': {},
+            'cell_elem': 'td',
+            # 'cell_attrs': {},
+            # 'header_elem': None,
+            # 'header_attrs': {},
+            # 'link_elem': '',
+            # 'link_key': '',
+            'columns': [
+                'Subscription Period',
+                'Listed',
+                'Company',
+                'Description',
+                'Document'
+            ],
+            'file': 'Spotlight'
+        },
+        'Nyemissioner': {
+            'exchange': 'Multiple',
+            'rank': None,
+            'location': 'Sweden',
+            # 'url': 'https://nyemissioner.se/foretag/planerad-noteringar/sokning/95861',
+            'table_num': 2,
+            'table_elem': 'table',
+            'table_attrs': {'class': ['rows', 'row-links']},
+            'row_elem': 'tr',
+            # 'row_attrs': {},
+            'cell_elem': 'td',
+            # 'cell_attrs': {},
+            # 'header_elem': None,
+            # 'header_attrs': {},
+            # 'link_elem': '',
+            # 'link_key': '',
+            'columns': [
+                'Company Name',
+                'Industry',
+                'List',
+                'Subscription period'
+            ],
+            'file': 'Nyemissioner'
+        },
         'Chittorgarh': {
             'exchange': 'NSE and BSE',
             # 'rank': None,
@@ -781,7 +854,7 @@ def read_json(file_name: str = 'sources'):
     return ex_dict
 
 
-def check_sources(file_name: str = 'sources', save_file_as: str = ''):
+def check_sources(file_name: str = 'sources'):
     ex_dict = read_json(file_name)
     df = pd.DataFrame(ex_dict).transpose()
     cols = ['exchange', 'rank', 'location', 'url', 'table_num', 'table_elem',  'table_attrs', 'row_elem',
@@ -789,12 +862,12 @@ def check_sources(file_name: str = 'sources', save_file_as: str = ''):
     # cols = ['exchange', 'rank', 'location', 'url', 'table_num', 'table_elem',  'table_attrs', 'row_elem', 'row_attrs',
     #         'cell_elem', 'cell_attrs', 'header_elem', 'header_attrs', 'columns', 'file']
     df = df[cols]
-    if save_file_as != '':
-        df.to_excel(save_file_as + '.xlsx', index_label='source', freeze_panes=(1, 0))
-        df.to_csv(save_file_as + '.csv', index_label='source')
+    if file_name != '':
+        df.to_excel(file_name + '.xlsx', index_label='source', freeze_panes=(1, 0))
+        df.to_csv(file_name + '.csv', index_label='source')
 
 
 if __name__ == '__main__':
     create_json_file()
-    check_sources(save_file_as='sources')
+    check_sources()
     ex_dict = read_json()

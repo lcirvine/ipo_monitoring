@@ -34,19 +34,19 @@ class DataTransformation:
     @staticmethod
     def format_date_cols(df: pd.DataFrame, date_cols: list, dayfirst=False):
         for c in date_cols:
-            df[c] = pd.to_datetime(df[c], errors='coerce', dayfirst=dayfirst)
+            df[c] = pd.to_datetime(df[c].fillna(pd.NaT), errors='coerce', dayfirst=dayfirst)
         return df
 
     def nyse(self):
         file_name = 'NYSE'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_up = self.src_dfs.get([file_name]).copy()
+        df_up = self.src_dfs.get(file_name).copy()
         df_up = self.format_date_cols(df_up, ['Expected Date', 'time_checked'])
         df_up.rename(columns={'Curr. File Price/Range($)': 'Price Range'}, inplace=True)
 
         file_name = 'NYSE Withdrawn'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_wd = self.src_dfs.get([file_name]).copy()
+        df_wd = self.src_dfs.get(file_name).copy()
         df_wd = self.format_date_cols(df_wd, ['Date W/P', 'time_checked'])
         df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date W/P'].astype(str)
 
@@ -58,7 +58,7 @@ class DataTransformation:
     def nasdaq(self):
         file_name = 'Nasdaq'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_up = self.src_dfs.get([file_name]).copy()
+        df_up = self.src_dfs.get(file_name).copy()
         df_up = self.format_date_cols(df_up, ['Expected IPO Date', 'time_checked'])
         df_up.rename(columns={'Exchange/ Market': 'Market', 'Expected IPO Date': 'IPO Date'}, inplace=True)
         df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price Range'] = df_up['Price']
@@ -66,13 +66,13 @@ class DataTransformation:
 
         file_name = 'Nasdaq Priced'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_p = self.src_dfs.get([file_name]).copy()
+        df_p = self.src_dfs.get(file_name).copy()
         df_p = self.format_date_cols(df_p, ['Date', 'time_checked'])
         df_p.rename(columns={'Exchange/ Market': 'Market', 'Date': 'IPO Date', 'Actions': 'Status'}, inplace=True)
 
         file_name = 'Nasdaq Withdrawn'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_wd = self.src_dfs.get([file_name]).copy()
+        df_wd = self.src_dfs.get(file_name).copy()
         df_wd = self.format_date_cols(df_wd, ['Date Filed', 'Date Withdrawn', 'time_checked'])
         df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date Withdrawn'].astype(str)
         df_wd['Status'] = 'Withdrawn'
@@ -111,7 +111,7 @@ class DataTransformation:
                                         'time_checked'])
         df['Company Name'] = df['New Share Name'].str.extract(r'^(\w*)\s')
         df['Symbol'] = df['Company Name'].str.extract(r'\w(\d*)\b')
-        df['Company Name'] = df['Company Name'].str.replace(r'\w(\d*)\b', '')
+        df['Company Name'] = df['Company Name'].str.replace(r'\w(\d*)\b', '', regex=True)
         df['Market'] = 'Shanghai Stock Exchange'
         df.rename(columns={'Listing date': 'IPO Date', 'Issue price': 'Price'}, inplace=True)
         self.append_to_all(df)
@@ -277,14 +277,33 @@ class DataTransformation:
         df = self.src_dfs.get(file_name).copy()
         # self.append_to_all(df)
 
+    def nasdaqnordic(self):
+        file_name = 'NasdaqNordic'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df = self.src_dfs.get(file_name).copy()
+        df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
+        df['Market'] = 'Nasdaq Nordic'
+        self.append_to_all(df)
+
+    def spotlight(self):
+        file_name = 'Spotlight'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df = self.src_dfs.get(file_name).copy()
+        df = self.format_date_cols(df, ['Listed', 'time_checked'])
+        df['Market'] = 'Spotlight'
+        df.rename(columns={'Company': 'Company Name', 'Listed': 'IPO Date', 'Description': 'Notes'},
+                  inplace=True)
+        self.append_to_all(df)
+
     def formatting_all(self):
+        self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
         self.df_all.loc[self.df_all['time_checked'] == self.df_all['time_checked'].max(), 'Notes'] = \
             'NEW ' + self.df_all['Notes'].fillna('')
-        self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
-        self.df_all['IPO Date'] = self.df_all['IPO Date'].dt.date
+        self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status']
+        self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today ' + self.df_all['Status']
+        # self.df_all['IPO Date'] = pd.to_datetime(self.df_all['IPO Date'].fillna(pd.NaT), errors='coerce').dt.strftime('%Y-%m-%d')
         self.df_all['IPO Date'] = self.df_all['IPO Date'].dt.strftime('%Y-%m-%d')
-        self.df_all.loc[self.df_all['IPO Date'] > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status']
-        self.df_all.loc[self.df_all['IPO Date'] == date.today(), 'Status'] = 'Listing Today ' + self.df_all['Status']
+
         self.df_all.sort_values(by='time_checked', ascending=False, inplace=True)
         self.df_all.drop_duplicates(subset='Company Name', keep='first', inplace=True)
         self.df_all.sort_values(by=['IPO Date', 'time_checked'], ascending=False, inplace=True)
@@ -322,6 +341,8 @@ def main():
         dt.idx()
         dt.bm()
         # dt.ipohub()
+        dt.nasdaqnordic()
+        dt.spotlight()
         dt.formatting_all()
         dt.save_all()
     except Exception as e:
@@ -332,45 +353,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-def hk():
-    print('HK')
-
-
-
-
-
-def korea():
-    print('Korea')
-
-
-def lse():
-    print('LSE')
-
-
-def madrid():
-    print('Madrid')
-
-
-def shanghai():
-    print('Shanghai')
-
-
-def shenzhen():
-    print('Shenzhen')
-
-
-def swiss():
-    print('Swiss')
-
-
-def tokyo():
-    print('Tokyo')
-
-
-def frankfurt():
-    print('Frankfurt')
-
-
-
