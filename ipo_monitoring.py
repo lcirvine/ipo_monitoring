@@ -1,14 +1,8 @@
-import configparser
+import source_reference
+import website_scraping
+import data_transformation
 
-config = configparser.ConfigParser()
-config.read('exchanges.ini')
-
-exchanges = {}
-for sect in config.sections():
-    exchanges[sect] = {}
-    for (k, v) in config.items(sect):
-        exchanges[sect][k] = v
-
-
-
+source_reference.main()
+website_scraping.main()
+data_transformation.main()
 
