@@ -206,7 +206,7 @@ class DataTransformation:
         df.loc[df['Company Name'].str.contains(' Private Pool'), 'Asset Type'] = 'Private Pool'
         df = df.loc[df['Asset Type'].isna()]
         df['Market'] = 'TSX'
-        df.rename(columns={'Date': 'IPO Date'}, inplace=True)
+        df.rename(columns={'Date': 'IPO Date', 'Ticker': 'Symbol'}, inplace=True)
         self.append_to_all(df)
 
     def bstsxv(self):
@@ -219,7 +219,7 @@ class DataTransformation:
         df.loc[df['Company Name'].str.contains(' Private Pool'), 'Asset Type'] = 'Private Pool'
         df = df.loc[df['Asset Type'].isna()]
         df['Market'] = 'TSX Venture'
-        df.rename(columns={'Date': 'IPO Date'}, inplace=True)
+        df.rename(columns={'Date': 'IPO Date', 'Ticker': 'Symbol'}, inplace=True)
         self.append_to_all(df)
 
     def nse(self):
