@@ -107,6 +107,15 @@ class DataTransformation:
         df.rename(columns={'name': 'Company Name', 'symbol': 'Symbol', 'ipoDate': 'IPO Date', 'exchange': 'Market', 'assetType': 'Notes'}, inplace=True)
         self.append_to_all(df)
 
+    def tkipo(self):
+        file_name = 'TokyoIPO'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df = self.src_dfs.get(file_name).copy()
+        df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
+        df.loc[~df['Price Expected Date'].isna(), 'Notes'] = 'Price expected ' + df['Price Expected Date']
+        df.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
+        self.append_to_all(df)
+
     def jpx(self):
         file_name = 'JPX'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
@@ -116,15 +125,6 @@ class DataTransformation:
         df.loc[df['Issue Name'].str.contains(r'\*\*', regex=True), 'Notes'] = 'Technical Listing'
         df['Issue Name'] = df['Issue Name'].str.replace(r'\*\*', '', regex=True)
         df['Issue Name'] = df['Issue Name'].str.strip()
-        df.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
-        self.append_to_all(df)
-
-    def tkipo(self):
-        file_name = 'TokyoIPO'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
-        df.loc[~df['Price Expected Date'].isna(), 'Notes'] = 'Price expected ' + df['Price Expected Date']
         df.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
         self.append_to_all(df)
 
@@ -182,20 +182,6 @@ class DataTransformation:
                            'Listing date': 'IPO date'}, inplace=True)
         self.append_to_all(df)
 
-    def tsx(self):
-        file_name = 'TSX'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Date', 'time_checked'])
-        df['Symbol'] = df['Company'].str.extract(r'\(([a-zA-Z\.,\s]*)\)')
-        df['Company Name'] = df['Company'].str.extract(r'^([a-zA-Z\.\s\d&,\-]*)[\xa0|\(]')
-        df['Company Name'] = df['Company Name'].str.strip()
-        df['Market'] = 'TSX or TSXV'
-        df.loc[df['Company Name'].str.contains(' ETF'), 'Asset Type'] = 'ETF'
-        df = df.loc[df['Asset Type'].isna()]
-        df.rename(columns={'Date': 'IPO Date'}, inplace=True)
-        self.append_to_all(df)
-
     def bstsx(self):
         file_name = 'BS-TSX'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
@@ -220,6 +206,20 @@ class DataTransformation:
         df = df.loc[df['Asset Type'].isna()]
         df['Market'] = 'TSX Venture'
         df.rename(columns={'Date': 'IPO Date', 'Ticker': 'Symbol'}, inplace=True)
+        self.append_to_all(df)
+
+    def tsx(self):
+        file_name = 'TSX'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df = self.src_dfs.get(file_name).copy()
+        df = self.format_date_cols(df, ['Date', 'time_checked'])
+        df['Symbol'] = df['Company'].str.extract(r'\(([a-zA-Z\.,\s]*)\)')
+        df['Company Name'] = df['Company'].str.extract(r'^([a-zA-Z\.\s\d&,\-]*)[\xa0|\(]')
+        df['Company Name'] = df['Company Name'].str.strip()
+        df['Market'] = 'TSX'
+        df.loc[df['Company Name'].str.contains(' ETF'), 'Asset Type'] = 'ETF'
+        df = df.loc[df['Asset Type'].isna()]
+        df.rename(columns={'Date': 'IPO Date'}, inplace=True)
         self.append_to_all(df)
 
     def nse(self):
@@ -354,11 +354,10 @@ class DataTransformation:
 
     def formatting_all(self):
         self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
-        self.df_all.loc[self.df_all['time_checked'] == self.df_all['time_checked'].max(), 'Notes'] = \
-            'NEW ' + self.df_all['Notes'].fillna('')
+        # self.df_all.loc[self.df_all['time_checked'] == self.df_all['time_checked'].max(), 'Notes'] = \
+        #     'NEW ' + self.df_all['Notes'].fillna('')
         self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status']
         self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today ' + self.df_all['Status']
-        # self.df_all['IPO Date'] = pd.to_datetime(self.df_all['IPO Date'].fillna(pd.NaT), errors='coerce').dt.strftime('%Y-%m-%d')
         self.df_all['IPO Date'] = self.df_all['IPO Date'].dt.strftime('%Y-%m-%d')
         self.df_all['Price'] = pd.to_numeric(self.df_all['Price'], errors='coerce')
         self.df_all.sort_values(by='time_checked', ascending=False, inplace=True)
@@ -372,7 +371,7 @@ class DataTransformation:
             self.df_all.to_excel(writer, sheet_name='All IPOs', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             for k, v in self.src_dfs.items():
                 v.to_excel(writer, sheet_name=k, index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
-            # self.writer.sheets['All IPOs'].activate()
+            writer.sheets['All IPOs'].activate()
             writer.save()
         else:
             self.df_all.to_excel(self.result_file, sheet_name='All IPOs', index=False, encoding='utf-8-sig',
@@ -385,16 +384,16 @@ def main():
         dt.nyse()
         dt.nasdaq()
         dt.iposcoop()
-        dt.jpx()
         dt.tkipo()
+        dt.jpx()
         dt.shanghai()
         dt.euronext()
         dt.aastocks()
         dt.lse()
         dt.cninfo()
-        dt.tsx()
         dt.bstsx()
         dt.bstsxv()
+        dt.tsx()
         dt.frankfurt()
         dt.krx()
         dt.asx()

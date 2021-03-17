@@ -292,6 +292,8 @@ class WebDriver:
 
 def main():
     wd = WebDriver()
+    wd.asx()
+    wd.tkipo()
     for k, v in wd.sources_dict.items():
         try:
             wd.load_url(v.get('url'), sleep_after=True)
@@ -311,8 +313,6 @@ def main():
             wd.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
             wd.webscraping_results.append([wd.time_checked_str, k, 0])
             pass
-    wd.asx()
-    wd.tkipo()
     wd.close_driver()
     wd.av_api()
     wd.save_webscraping_results()

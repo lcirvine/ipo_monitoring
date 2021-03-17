@@ -341,6 +341,52 @@ sources_dict = {
         ],
         'file': 'CNInfo'
     },
+    'BS-TSX': {
+        'exchange': 'TSX',
+        'rank': None,
+        'location': 'Toronto',
+        'url': 'https://www.baystreet.ca/articles/ipo_tsx.aspx',
+        'table_num': 0,
+        'table_elem': 'table',
+        'table_attrs': {'class': 'gridview'},
+        'row_elem': 'tr',
+        # 'row_attrs': {},
+        'cell_elem': 'td',
+        # 'cell_attrs': {},
+        # 'header_elem': None,
+        # 'header_attrs': {},
+        # 'link_elem': '',
+        # 'link_key': '',
+        'columns': [
+            'Company Name',
+            'Ticker',
+            'Date'
+        ],
+        'file': 'BS-TSX'
+    },
+    'BS-TSXV': {
+        'exchange': 'TSX',
+        'rank': None,
+        'location': 'Toronto',
+        'url': 'https://www.baystreet.ca/articles/ipo_tsxv.aspx',
+        'table_num': 0,
+        'table_elem': 'table',
+        'table_attrs': {'class': 'gridview'},
+        'row_elem': 'tr',
+        # 'row_attrs': {},
+        'cell_elem': 'td',
+        # 'cell_attrs': {},
+        # 'header_elem': None,
+        # 'header_attrs': {},
+        # 'link_elem': '',
+        # 'link_key': '',
+        'columns': [
+            'Company Name',
+            'Ticker',
+            'Date'
+        ],
+        'file': 'BS-TSXV'
+    },
     'TSX': {
         'exchange': 'Toronto Stock Exchange',
         'rank': 9,
@@ -644,52 +690,6 @@ sources_dict = {
             'Document'
         ],
         'file': 'Spotlight'
-    },
-    'BS-TSX': {
-        'exchange': 'TSX',
-        'rank': None,
-        'location': 'Toronto',
-        'url': 'https://www.baystreet.ca/articles/ipo_tsx.aspx',
-        'table_num': 0,
-        'table_elem': 'table',
-        'table_attrs': {'class': 'gridview'},
-        'row_elem': 'tr',
-        # 'row_attrs': {},
-        'cell_elem': 'td',
-        # 'cell_attrs': {},
-        # 'header_elem': None,
-        # 'header_attrs': {},
-        # 'link_elem': '',
-        # 'link_key': '',
-        'columns': [
-            'Company Name',
-            'Ticker',
-            'Date'
-        ],
-        'file': 'BS-TSX'
-    },
-    'BS-TSXV': {
-        'exchange': 'TSX',
-        'rank': None,
-        'location': 'Toronto',
-        'url': 'https://www.baystreet.ca/articles/ipo_tsxv.aspx',
-        'table_num': 0,
-        'table_elem': 'table',
-        'table_attrs': {'class': 'gridview'},
-        'row_elem': 'tr',
-        # 'row_attrs': {},
-        'cell_elem': 'td',
-        # 'cell_attrs': {},
-        # 'header_elem': None,
-        # 'header_attrs': {},
-        # 'link_elem': '',
-        # 'link_key': '',
-        'columns': [
-            'Company Name',
-            'Ticker',
-            'Date'
-        ],
-        'file': 'BS-TSXV'
     }
 }
 
