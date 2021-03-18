@@ -195,6 +195,7 @@ class WebDriver:
             df.replace('', np.nan, inplace=True)
             df.dropna(how='all', inplace=True)
             df.drop(columns=['Blank_0', 'Business Description', 'Blank_1'],  inplace=True, errors='ignore')
+            df['Company Name'] = df['Company Name'].str.strip()
             df['Price Range Expected Date'] = df['Price Range'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
             df['Price Expected Date'] = df['Price'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
             df['Price'] = pd.to_numeric(df['Price'].str.replace(',', ''), errors='coerce')
@@ -206,7 +207,7 @@ class WebDriver:
             # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
             # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
             df.loc[df['IPO Date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'IPO Date'] = df['IPO Date'] - pd.offsets.DateOffset(years=1)
-            df['Market'] = 'Tokyo Stock Exchange' + ' - ' + df['Symbol'].str.extract(r'\((\w*)\)')
+            df['Market'] = 'Japan Stock Exchange' + ' - ' + df['Symbol'].str.extract(r'\((\w*)\)')
             df['Symbol'] = df['Symbol'].str.replace(r'(\(\w*\))', '', regex=True)
             df['time_checked'] = self.time_checked_str
             if df is not None:

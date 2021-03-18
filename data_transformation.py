@@ -11,7 +11,7 @@ pd.options.mode.chained_assignment = None
 class DataTransformation:
     def __init__(self):
         self.source_folder = os.path.join(os.getcwd(), 'Data from Sources')
-        self.final_cols = ['Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 'Status', 'time_checked', 'Notes']
+        self.final_cols = ['Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 'Status', 'Notes', 'time_checked', ]
         self.df_all = pd.DataFrame(columns=self.final_cols)
         self.result_folder = os.path.join(os.getcwd(), 'Results')
         if not os.path.exists(self.result_folder):
@@ -50,6 +50,7 @@ class DataTransformation:
         df_wd = self.src_dfs.get(file_name).copy()
         df_wd = self.format_date_cols(df_wd, ['Date W/P', 'time_checked'])
         df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date W/P'].astype(str)
+        df_wd['Market'] = 'NYSE'
 
         df = pd.concat([df_up, df_wd], ignore_index=True, sort=False)
         df.rename(columns={'Issuer': 'Company Name', 'Ticker': 'Symbol', 'Expected Date': 'IPO Date',
@@ -107,25 +108,29 @@ class DataTransformation:
         df.rename(columns={'name': 'Company Name', 'symbol': 'Symbol', 'ipoDate': 'IPO Date', 'exchange': 'Market', 'assetType': 'Notes'}, inplace=True)
         self.append_to_all(df)
 
-    def tkipo(self):
-        file_name = 'TokyoIPO'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
-        df.loc[~df['Price Expected Date'].isna(), 'Notes'] = 'Price expected ' + df['Price Expected Date']
-        df.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
-        self.append_to_all(df)
-
     def jpx(self):
         file_name = 'JPX'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Date of Listing', 'Date of Listing Approval', 'time_checked'])
-        df['Market'] = 'Japan Stock Exchange - ' + df['Market Division']
-        df.loc[df['Issue Name'].str.contains(r'\*\*', regex=True), 'Notes'] = 'Technical Listing'
-        df['Issue Name'] = df['Issue Name'].str.replace(r'\*\*', '', regex=True)
-        df['Issue Name'] = df['Issue Name'].str.strip()
-        df.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
+        df_jp = self.src_dfs.get(file_name).copy()
+        df_jp = self.format_date_cols(df_jp, ['Date of Listing', 'Date of Listing Approval', 'time_checked'])
+        df_jp['Market'] = 'Japan Stock Exchange - ' + df_jp['Market Division']
+        df_jp.loc[df_jp['Issue Name'].str.contains(r'\*\*', regex=True), 'Notes'] = 'Technical Listing'
+        df_jp['Issue Name'] = df_jp['Issue Name'].str.replace(r',', ', ')
+        df_jp['Issue Name'] = df_jp['Issue Name'].str.replace(r'\*\*', '', regex=True)
+        df_jp['Issue Name'] = df_jp['Issue Name'].str.strip()
+        df_jp.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
+        
+        file_name = 'TokyoIPO'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df_tk = self.src_dfs.get(file_name).copy()
+        df_tk = self.format_date_cols(df_tk, ['IPO Date', 'time_checked'])
+        df_tk.loc[~df_tk['Price Range Expected Date'].isna(), 'Notes'] = 'Price Range expected ' + df_tk['Price Expected Date']
+        df_tk.loc[~df_tk['Price Expected Date'].isna(), 'Notes'] = 'Price expected ' + df_tk['Price Expected Date']
+        df_tk.rename(columns={'Date of Listing': 'IPO Date', 'Issue Name': 'Company Name', 'Code': 'Symbol'}, inplace=True)
+
+        df = pd.merge(df_jp, df_tk[['Symbol', 'IPO Date', 'Price', 'Price Range', 'Notes', 'time_checked']], how='left',
+                      on=['Symbol', 'IPO Date', 'time_checked'], suffixes=('_jp', '_tk'))
+        df['Notes'] = df['Notes_tk'].fillna('') + df['Notes_jp'].fillna('')
         self.append_to_all(df)
 
     def shanghai(self):
@@ -356,12 +361,13 @@ class DataTransformation:
         self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
         # self.df_all.loc[self.df_all['time_checked'] == self.df_all['time_checked'].max(), 'Notes'] = \
         #     'NEW ' + self.df_all['Notes'].fillna('')
-        self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status']
-        self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today ' + self.df_all['Status']
+        self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status'].fillna('')
+        self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today'
+        self.df_all['Status'] = self.df_all['Status'].str.strip()
         self.df_all['IPO Date'] = self.df_all['IPO Date'].dt.strftime('%Y-%m-%d')
         self.df_all['Price'] = pd.to_numeric(self.df_all['Price'], errors='coerce')
         self.df_all.sort_values(by='time_checked', ascending=False, inplace=True)
-        self.df_all.drop_duplicates(subset='Company Name', keep='first', inplace=True)
+        self.df_all.drop_duplicates(subset=['Company Name', 'IPO Date', 'Price'], inplace=True)
         self.df_all.sort_values(by=['IPO Date', 'time_checked'], ascending=False, inplace=True)
         self.df_all.reset_index(drop=True, inplace=True)
 
@@ -384,7 +390,6 @@ def main():
         dt.nyse()
         dt.nasdaq()
         dt.iposcoop()
-        dt.tkipo()
         dt.jpx()
         dt.shanghai()
         dt.euronext()
