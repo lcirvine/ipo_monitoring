@@ -33,9 +33,9 @@ def email_report(attach_file=None, addtl_message: str = ''):
     logger.info('Email sent')
 
 
-def main():
+def main(file_attachment: str):
     try:
-        email_report()
+        email_report(attach_file=file_attachment)
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))
@@ -43,4 +43,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(os.path.join(os.getcwd(), 'Results', 'All IPOs.xlsx'))

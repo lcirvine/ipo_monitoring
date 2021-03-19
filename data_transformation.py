@@ -50,7 +50,7 @@ class DataTransformation:
         df_wd = self.src_dfs.get(file_name).copy()
         df_wd = self.format_date_cols(df_wd, ['Date W/P', 'time_checked'])
         df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date W/P'].astype(str)
-        df_wd['Market'] = 'NYSE'
+        df_wd['Exchange'] = 'NYSE'
 
         df = pd.concat([df_up, df_wd], ignore_index=True, sort=False)
         df.rename(columns={'Issuer': 'Company Name', 'Ticker': 'Symbol', 'Expected Date': 'IPO Date',

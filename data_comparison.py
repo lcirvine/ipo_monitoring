@@ -79,10 +79,14 @@ class DataComparison:
 
     def concatenate_ticker_exchange(self):
         self.df_pp.drop_duplicates(inplace=True)
-        df_tickers = self.df_pp.dropna(subset=['ticker'])
+        df_tickers = self.df_pp[['iconum', 'ticker']].dropna(subset=['ticker'])
         df_tickers['ticker'] = df_tickers['ticker'].astype(str)
+        df_tickers.drop_duplicates(inplace=True)
         df_tickers = df_tickers.groupby('iconum')['ticker'].apply(', '.join).reset_index()
-        df_exch = self.df_pp.dropna(subset=['exchange']).groupby('iconum')['exchange'].apply(', '.join).reset_index()
+        df_exch = self.df_pp[['iconum', 'exchange']].dropna(subset=['exchange'])
+        df_exch['exchange'] = df_exch['exchange'].str.strip()
+        df_exch.drop_duplicates(inplace=True)
+        df_exch = df_exch.groupby('iconum')['exchange'].apply(', '.join).reset_index()
         self.df_pp = self.df_pp.merge(df_tickers, how='left', on='iconum', suffixes=('_drop', ''))
         self.df_pp = self.df_pp.merge(df_exch, how='left', on='iconum', suffixes=('_drop', ''))
         self.df_pp.drop(columns=['ticker_drop', 'exchange_drop'], inplace=True)
@@ -94,6 +98,7 @@ class DataComparison:
 
     def compare(self):
         df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'iconum']], how='left')
+        df_m = pd.concat([df_m, self.df_pp], axis=1, join='left')
         df_m = pd.merge(df_m, self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         with pd.ExcelWriter(self.results_folder, 'IPO Monitoring.xlsx') as writer:
             df_m.to_excel(writer, sheet_name='Comparison', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
