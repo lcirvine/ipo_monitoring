@@ -359,8 +359,6 @@ class DataTransformation:
 
     def formatting_all(self):
         self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
-        # self.df_all.loc[self.df_all['time_checked'] == self.df_all['time_checked'].max(), 'Notes'] = \
-        #     'NEW ' + self.df_all['Notes'].fillna('')
         self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status'].fillna('')
         self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today'
         self.df_all['Status'] = self.df_all['Status'].str.strip()
