@@ -104,10 +104,13 @@ class DataComparison:
         df_m.drop_duplicates(inplace=True)
         for c in [col for col in df_m.columns if 'date' in col.lower()]:
             df_m[c] = pd.to_datetime(df_m[c], errors='coerce').dt.date
-        df_m.loc[df_m['IPO Date'] != df_m['trading_date'], 'IPO Dates Match'] = False
-        df_m.loc[df_m['IPO Date'] == df_m['trading_date'], 'IPO Dates Match'] = True
-        df_m.loc[df_m['Price_external'] != df_m['Price_fds'], 'IPO Prices Match'] = False
-        df_m.loc[df_m['Price_external'] == df_m['Price_fds'], 'IPO Prices Match'] = True
+        df_m['IPO Dates Match'] = df_m['IPO Date'] == df_m['trading_date']
+        df_m['IPO Prices Match'] = df_m['Price_external'] == df_m['Price_fds']
+        df_m = df_m[['IPO Dates Match', 'IPO Prices Match', 'Company Name_external', 'Symbol', 'Market', 'IPO Date',
+                     'Price_external', 'Price Range', 'Status', 'Notes', 'time_checked', 'iconum', 'Company Name_fds',
+                     'master_deal', 'client_deal_id', 'ticker', 'exchange', 'Price_fds', 'min_offering_price',
+                     'max_offering_price', 'announcement_date', 'pricing_date', 'trading_date', 'closing_date',
+                     'deal_status', 'last_updated_date_utc']]
         with pd.ExcelWriter(os.path.join(self.results_folder, 'IPO Monitoring.xlsx')) as writer:
             df_m.to_excel(writer, sheet_name='Comparison', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             self.df_s.to_excel(writer, sheet_name='Upcoming IPOs - External', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
