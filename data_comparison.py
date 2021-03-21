@@ -83,12 +83,14 @@ class DataComparison:
         df_tickers['ticker'] = df_tickers['ticker'].astype(str)
         df_tickers.drop_duplicates(inplace=True)
         df_tickers = df_tickers.groupby('iconum')['ticker'].apply(', '.join).reset_index()
+        df_tickers.set_index('iconum', inplace=True)
         df_exch = self.df_pp[['iconum', 'exchange']].dropna(subset=['exchange'])
         df_exch['exchange'] = df_exch['exchange'].str.strip()
         df_exch.drop_duplicates(inplace=True)
         df_exch = df_exch.groupby('iconum')['exchange'].apply(', '.join).reset_index()
-        self.df_pp = self.df_pp.merge(df_tickers, how='left', on='iconum', suffixes=('_drop', ''))
-        self.df_pp = self.df_pp.merge(df_exch, how='left', on='iconum', suffixes=('_drop', ''))
+        df_exch.set_index('iconum', inplace=True)
+        df_te = pd.concat([df_tickers, df_exch], axis=1).reset_index()
+        self.df_pp = self.df_pp.merge(df_te, how='left', on='iconum', suffixes=('_drop', ''))
         self.df_pp.drop(columns=['ticker_drop', 'exchange_drop'], inplace=True)
         self.df_pp.drop_duplicates(inplace=True)
         self.df_pp = self.df_pp[['iconum', 'Company Name', 'master_deal', 'client_deal_id', 'ticker', 'exchange',
@@ -98,9 +100,15 @@ class DataComparison:
 
     def compare(self):
         df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'iconum']], how='left')
-        df_m = pd.concat([df_m, self.df_pp], axis=1, join='left')
         df_m = pd.merge(df_m, self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
-        with pd.ExcelWriter(self.results_folder, 'IPO Monitoring.xlsx') as writer:
+        df_m.drop_duplicates(inplace=True)
+        for c in [col for col in df_m.columns if 'date' in col.lower()]:
+            df_m[c] = pd.to_datetime(df_m[c], errors='coerce').dt.date
+        df_m.loc[df_m['IPO Date'] != df_m['trading_date'], 'IPO Dates Match'] = False
+        df_m.loc[df_m['IPO Date'] == df_m['trading_date'], 'IPO Dates Match'] = True
+        df_m.loc[df_m['Price_external'] != df_m['Price_fds'], 'IPO Prices Match'] = False
+        df_m.loc[df_m['Price_external'] == df_m['Price_fds'], 'IPO Prices Match'] = True
+        with pd.ExcelWriter(os.path.join(self.results_folder, 'IPO Monitoring.xlsx')) as writer:
             df_m.to_excel(writer, sheet_name='Comparison', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             self.df_s.to_excel(writer, sheet_name='Upcoming IPOs - External', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             self.df_pp.to_excel(writer, sheet_name='PEO-PIPE IPO Data', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
