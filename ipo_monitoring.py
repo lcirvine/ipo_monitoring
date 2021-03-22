@@ -8,5 +8,6 @@ import email_report
 source_reference.main()
 website_scraping.main()
 data_transformation.main()
-data_comparison.main()
-email_report.main(os.path.join(os.getcwd(), 'Results', 'IPO Monitoring.xlsx'))
+df_summary = data_comparison.main()
+email_report.main(file_attachment=os.path.join(os.getcwd(), 'Results', 'IPO Monitoring.xlsx'),
+                  addtl_message=df_summary.to_html(na_rep="", index=False, justify="left"))

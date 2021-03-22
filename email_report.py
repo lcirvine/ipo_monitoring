@@ -33,9 +33,9 @@ def email_report(attach_file=None, addtl_message: str = ''):
     logger.info('Email sent')
 
 
-def main(file_attachment: str):
+def main(file_attachment: str, addtl_message: str = ''):
     try:
-        email_report(attach_file=file_attachment)
+        email_report(attach_file=file_attachment, addtl_message=addtl_message)
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))

@@ -2,6 +2,7 @@ import os
 import sys
 import pyodbc
 import pandas as pd
+from datetime import date
 from configparser import ConfigParser
 from logging_ipo_dates import logger
 
@@ -111,10 +112,18 @@ class DataComparison:
                      'master_deal', 'client_deal_id', 'ticker', 'exchange', 'Price_fds', 'min_offering_price',
                      'max_offering_price', 'announcement_date', 'pricing_date', 'trading_date', 'closing_date',
                      'deal_status', 'last_updated_date_utc']]
+        df_summary = df_m[['Company Name_external', 'iconum', 'master_deal', 'IPO Date', 'Symbol', 'Market',
+                           'Price_external', 'IPO Dates Match', 'IPO Prices Match']]
+        df_summary.rename(columns={'Company Name_external': 'Company Name', 'Price_external': 'Price'}, inplace=True)
+        df_summary.drop_duplicates(inplace=True)
+        df_summary = df_summary.loc[df_summary['IPO Date'] >= date.today()]
+        df_summary.sort_values('IPO Date', inplace=True)
         with pd.ExcelWriter(os.path.join(self.results_folder, 'IPO Monitoring.xlsx')) as writer:
             df_m.to_excel(writer, sheet_name='Comparison', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             self.df_s.to_excel(writer, sheet_name='Upcoming IPOs - External', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             self.df_pp.to_excel(writer, sheet_name='PEO-PIPE IPO Data', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
+            df_summary.to_excel(writer, sheet_name='Summary', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
+        return df_summary
 
 
 def main():
@@ -122,7 +131,7 @@ def main():
     try:
         dc.update_entity_mapping()
         dc.concatenate_ticker_exchange()
-        dc.compare()
+        return dc.compare()
     except Exception as e:
         print(e)
         logger.error(e, exc_info=sys.exc_info())
