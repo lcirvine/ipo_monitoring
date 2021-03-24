@@ -306,6 +306,7 @@ def main():
                 df.to_csv(s_file, index=False, encoding='utf-8-sig')
                 wd.webscraping_results.append([wd.time_checked_str, k, 1])
         except Exception as e:
+            # ToDo: If there's an exception, the key is the NEXT key rather than the one that threw the exception. Why?
             logger.error(f"ERROR for {k}")
             logger.error(e, exc_info=sys.exc_info())
             logger.info('-' * 100)
