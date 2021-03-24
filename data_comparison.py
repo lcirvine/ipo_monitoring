@@ -35,6 +35,9 @@ class DataComparison:
             df = pd.concat([pd.read_excel(pp_file), df], ignore_index=True, sort=False)
         df['exchange'] = df['exchange'].str.strip()
         df.sort_values(by='last_updated_date_utc', ascending=False, inplace=True)
+        # numeric tickers could appear as duplicates if the same ticker has been interpreted as numeric and string
+        # Also could have duplicates if ticker is initially NA, then later added for the same master deal
+        df['ticker'] = df['ticker'].astype(str)
         df.drop_duplicates(subset=['iconum', 'master_deal', 'ticker'], inplace=True)
         df.to_excel(pp_file, index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
         return df
@@ -67,7 +70,10 @@ class DataComparison:
                                  'last_updated_date_utc']]
 
     def compare(self):
-        df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'iconum']], how='left')
+        df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'entityName', 'iconum']], how='left')
+        # for Chinese Exchanges, get the English name if possible
+        cn_exch = ['Shenzhen Stock Exchange', 'Shanghai Stock Exchange']
+        df_m.loc[(df_m['Market'].isin(cn_exch)) & ~df_m['entityName'].isna(), 'Company Name'] = df_m['entityName']
         df_m = pd.merge(df_m, self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
         for c in [col for col in df_m.columns if 'date' in col.lower()]:

@@ -372,7 +372,7 @@ class DataTransformation:
         self.df_all['IPO Date'] = self.df_all['IPO Date'].dt.strftime('%Y-%m-%d')
         self.df_all['Price'] = pd.to_numeric(self.df_all['Price'], errors='coerce')
         self.df_all.sort_values(by='time_checked', ascending=False, inplace=True)
-        self.df_all.drop_duplicates(subset=['Company Name', 'IPO Date', 'Price'], inplace=True)
+        self.df_all.drop_duplicates(subset=['Company Name', 'Market'], inplace=True)
         self.df_all.sort_values(by=['IPO Date', 'time_checked'], ascending=False, inplace=True)
         self.df_all.reset_index(drop=True, inplace=True)
 
