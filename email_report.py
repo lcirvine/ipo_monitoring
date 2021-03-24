@@ -4,6 +4,7 @@ from datetime import date
 import configparser
 import win32com.client as win32
 from logging_ipo_dates import logger, error_email
+import pandas as pd
 
 config = configparser.ConfigParser()
 config.read('email_settings.ini')
@@ -43,4 +44,6 @@ def main(file_attachment: str, addtl_message: str = ''):
 
 
 if __name__ == '__main__':
-    main(os.path.join(os.getcwd(), 'Results', 'All IPOs.xlsx'))
+    file = os.path.join(os.getcwd(), 'Results', 'IPO Monitoring.xlsx')
+    df_summary = pd.read_excel(file, sheet_name='Summary')
+    main(file_attachment=file, addtl_message=df_summary.to_html(na_rep="", index=False, justify="left"))

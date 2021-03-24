@@ -152,7 +152,7 @@ class WebDriver:
             listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
             df = pd.DataFrame(listing_info)
             df.columns = ['listing_info']
-            df['Company Name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.]*)\s\-')
+            df['Company Name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
             df['IPO Date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
             df['IPO Date'] = pd.to_datetime(df['IPO Date'], errors='coerce').dt.date
             df['Market'] = 'Australia Stock Exchange'
@@ -293,8 +293,7 @@ class WebDriver:
 
 def main():
     wd = WebDriver()
-    wd.asx()
-    wd.tkipo()
+    wd.random_wait()
     for k, v in wd.sources_dict.items():
         try:
             wd.load_url(v.get('url'), sleep_after=True)
@@ -314,6 +313,8 @@ def main():
             wd.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
             wd.webscraping_results.append([wd.time_checked_str, k, 0])
             pass
+    wd.asx()
+    wd.tkipo()
     wd.close_driver()
     wd.av_api()
     wd.save_webscraping_results()

@@ -6,7 +6,7 @@ import win32com.client as win32
 
 
 log_file = 'IPO Monitoring Logs.txt'
-log_folder = os.path.join('Logs')
+log_folder = os.path.join(os.getcwd(), 'Logs')
 screenshot_folder = os.path.join(log_folder, 'Screenshots')
 today_date = date.today().strftime('%Y-%m-%d')
 
@@ -42,4 +42,5 @@ def error_email(error_message: str = ''):
 
 
 def consolidate_webscraping_results():
+    # ToDo: review webscraping results to see how the webscraper is performing
     pass

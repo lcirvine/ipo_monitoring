@@ -45,39 +45,6 @@ class DataComparison:
     def source_data(self):
         return pd.read_excel(os.path.join(self.results_folder, 'All IPOs.xlsx'))
 
-    def update_entity_mapping(self):
-        df_e_un = pd.merge(self.df_s, self.df_e, how='outer', on='Company Name', suffixes=('', '_ent'), indicator=True)
-        df_e_un = df_e_un.loc[df_e_un['_merge'] == 'left_only']
-        df_cn = df_e_un.loc[df_e_un['Market'].isin(['Shenzhen Stock Exchange', 'Shanghai Stock Exchange'])]
-        df_e_un.drop(df_cn.index, inplace=True)
-        df_e_un.dropna(subset=['Company Name'], inplace=True)
-        if len(df_e_un['Company Name']) > 0:
-            new_names = ', '.join("('" + df_e_un['Company Name'] + "')")
-            query = f"""
-                    SELECT 
-                    [Name]
-                    ,CASE 
-                    WHEN dbo.ufn_entity_match([Name]) = 'No Match' THEN NULL
-                    ELSE dbo.ufn_entity_match([Name])
-                    END AS [entity_id]
-                    ,CASE 
-                    WHEN dbo.ufn_entity_match([Name]) = 'No Match' THEN NULL
-                    ELSE dbo.ufn_fdsuid_to_entityid(dbo.ufn_entity_match([Name])) 
-                    END AS iconum
-                    FROM (VALUES
-                    {new_names}
-                    ) AS co_names([Name])
-                    """
-            df_e_new = pd.read_sql_query(query, self.return_db_connection('lion'))
-            df_e_new = pd.merge(df_e_new, self.df_s[['Company Name', 'Symbol', 'Market']], how='left', left_on='Name', right_on='Company Name')
-            self.df_e = pd.concat([self.df_e, df_e_new])
-        df_cn = pd.merge(df_cn[['Company Name', 'Symbol', 'Market']], self.df_pp[['iconum', 'ticker']], how='left',
-                         left_on='Symbol', right_on='ticker')
-        df_cn.dropna(subset=['iconum'], inplace=True)
-        if len(df_cn) > 0:
-            self.df_e = pd.concat([self.df_e, df_cn])
-        self.df_e.to_excel(os.path.join(self.ref_folder, 'Entity Mapping.xlsx'))
-
     def concatenate_ticker_exchange(self):
         self.df_pp.drop_duplicates(inplace=True)
         df_tickers = self.df_pp[['iconum', 'ticker']].dropna(subset=['ticker'])
@@ -107,11 +74,13 @@ class DataComparison:
             df_m[c] = pd.to_datetime(df_m[c], errors='coerce').dt.date
         df_m['IPO Dates Match'] = df_m['IPO Date'] == df_m['trading_date']
         df_m['IPO Prices Match'] = df_m['Price_external'] == df_m['Price_fds']
-        df_m = df_m[['IPO Dates Match', 'IPO Prices Match', 'Company Name_external', 'Symbol', 'Market', 'IPO Date',
-                     'Price_external', 'Price Range', 'Status', 'Notes', 'time_checked', 'iconum', 'Company Name_fds',
+        df_m.loc[df_m['Price_external'].isna(), 'IPO Prices Match'] = True
+        df_m = df_m[['IPO Dates Match', 'IPO Prices Match', 'iconum', 'Company Name_external', 'Symbol', 'Market',
+                     'IPO Date', 'Price_external', 'Price Range', 'Status', 'Notes', 'time_checked', 'Company Name_fds',
                      'master_deal', 'client_deal_id', 'ticker', 'exchange', 'Price_fds', 'min_offering_price',
                      'max_offering_price', 'announcement_date', 'pricing_date', 'trading_date', 'closing_date',
                      'deal_status', 'last_updated_date_utc']]
+        df_m.drop_duplicates(inplace=True)
         df_summary = df_m[['Company Name_external', 'iconum', 'master_deal', 'IPO Date', 'Symbol', 'Market',
                            'Price_external', 'IPO Dates Match', 'IPO Prices Match']]
         df_summary.rename(columns={'Company Name_external': 'Company Name', 'Price_external': 'Price'}, inplace=True)
@@ -129,7 +98,6 @@ class DataComparison:
 def main():
     dc = DataComparison()
     try:
-        dc.update_entity_mapping()
         dc.concatenate_ticker_exchange()
         return dc.compare()
     except Exception as e:
