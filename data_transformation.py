@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 import numpy as np
 from datetime import date
-from logging_ipo_dates import logger
+from logging_ipo_dates import logger, error_email
 
 pd.options.mode.chained_assignment = None
 
@@ -38,13 +38,13 @@ class DataTransformation:
 
     def nyse(self):
         # ToDo: combine data from all US sources
-        # ToDo: if price is NA, add a note that expected to price day before listing
         file_name = 'NYSE'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
         df_up = self.src_dfs.get(file_name).copy()
         df_up = self.format_date_cols(df_up, ['Expected Date', 'time_checked'])
         # NYSE provides the expected pricing date, the expected listing date is one day after
-        df_up['Expected Date'] = df_up['Expected Date'] + pd.offsets.DateOffset(days=1)
+        df_up.loc[df_up['Expected Date'] >= pd.to_datetime('today'), 'Notes'] = 'Price expected ' + df_up['Expected Date'].astype(str)
+        df_up['IPO Date'] = df_up['Expected Date'] + pd.offsets.DateOffset(days=1)
         df_up.rename(columns={'Curr. File Price/Range($)': 'Price Range'}, inplace=True)
 
         file_name = 'NYSE Withdrawn'
@@ -55,8 +55,7 @@ class DataTransformation:
         df_wd['Exchange'] = 'NYSE'
 
         df = pd.concat([df_up, df_wd], ignore_index=True, sort=False)
-        df.rename(columns={'Issuer': 'Company Name', 'Ticker': 'Symbol', 'Expected Date': 'IPO Date',
-                           'Exchange': 'Market'}, inplace=True)
+        df.rename(columns={'Issuer': 'Company Name', 'Ticker': 'Symbol', 'Exchange': 'Market'}, inplace=True)
         self.append_to_all(df)
 
     def nasdaq(self):
@@ -67,6 +66,9 @@ class DataTransformation:
         df_up.rename(columns={'Exchange/ Market': 'Market', 'Expected IPO Date': 'IPO Date'}, inplace=True)
         df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price Range'] = df_up['Price']
         df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price'] = np.nan
+        # pricing is expected the day before the IPO
+        df_up.loc[df_up['IPO Date'] >= pd.to_datetime('today'), 'Notes'] = 'Price expected ' + (
+                    df_up['IPO Date'] - pd.offsets.DateOffset(days=1)).astype(str)
 
         file_name = 'Nasdaq Priced'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
@@ -364,7 +366,6 @@ class DataTransformation:
         self.append_to_all(df)
 
     def formatting_all(self):
-        # ToDo: check the sorting and dropping duplicates so that only most recent is kept
         self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
         self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status'].fillna('')
         self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today'
@@ -390,6 +391,7 @@ class DataTransformation:
 
 
 def main():
+    logger.info("Combining all the data from external sources together")
     dt = DataTransformation()
     try:
         dt.nyse()
@@ -415,9 +417,9 @@ def main():
         dt.nasdaqnordic()
         dt.spotlight()
     except Exception as e:
-        print(e)
         logger.error(e, exc_info=sys.exc_info())
         logger.info('-' * 100)
+        error_email(str(e))
     finally:
         dt.formatting_all()
         dt.save_all()

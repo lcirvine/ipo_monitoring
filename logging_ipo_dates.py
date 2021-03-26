@@ -19,7 +19,6 @@ handler.setFormatter(formatter)
 logger = logging.getLogger()
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
-logger.info('-' * 100)
 
 
 def error_email(error_message: str = ''):

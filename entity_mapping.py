@@ -8,7 +8,7 @@ from time import sleep
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from configparser import ConfigParser
-from logging_ipo_dates import logger
+from logging_ipo_dates import logger, error_email
 
 pd.options.mode.chained_assignment = None
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -99,6 +99,7 @@ class EntityMatchBulk:
         drop_cols = ['url', 'stateCode', 'stateName', 'sicCode', 'entitySubTypeCode', 'locationCity', 'regionName',
                      'factsetIndustryCode', 'factsetIndustryName', 'factsetSectorCode', 'factsetSectorName',
                      'parentName', 'parentMatchFlag', 'nameMatchString', 'nameMatchSource']
+        # ToDo: drop rows with confidence below a certain threshold, say .60
         df.drop(columns=drop_cols, inplace=True, errors='ignore')
         df.sort_values(by=['matchFlag', 'similarityScore'], ascending=False, inplace=True)
         df.drop_duplicates(subset=['clientName'], inplace=True)
@@ -147,6 +148,7 @@ class EntityMatchBulk:
 
 
 def main():
+    logger.info("Checking Cordance API for entity IDs")
     em = EntityMatchBulk()
     try:
         em.create_csv()
@@ -154,6 +156,7 @@ def main():
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         logger.info('-' * 100)
+        error_email(str(e))
 
 
 if __name__ == '__main__':

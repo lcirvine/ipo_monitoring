@@ -294,6 +294,7 @@ class WebDriver:
 def main():
     wd = WebDriver()
     wd.random_wait()
+    logger.info("Gathering data from sources")
     for k, v in wd.sources_dict.items():
         try:
             wd.load_url(v.get('url'), sleep_after=True)

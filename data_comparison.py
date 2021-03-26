@@ -2,9 +2,10 @@ import os
 import sys
 import pyodbc
 import pandas as pd
+import numpy as np
 from datetime import date
 from configparser import ConfigParser
-from logging_ipo_dates import logger
+from logging_ipo_dates import logger, error_email
 
 pd.options.mode.chained_assignment = None
 
@@ -39,6 +40,7 @@ class DataComparison:
         # Also could have duplicates if ticker is initially NA, then later added for the same master deal
         df['ticker'] = df['ticker'].astype(str)
         df.drop_duplicates(subset=['iconum', 'master_deal', 'ticker'], inplace=True)
+        df['ticker'] = df['ticker'].replace(['nan', 'None'], np.nan)
         df.to_excel(pp_file, index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
         return df
 
@@ -50,6 +52,7 @@ class DataComparison:
 
     def concatenate_ticker_exchange(self):
         self.df_pp.drop_duplicates(inplace=True)
+        self.df_pp['ticker'] = self.df_pp['ticker'].replace(['nan', 'None'], np.nan)
         df_tickers = self.df_pp[['iconum', 'ticker']].dropna(subset=['ticker'])
         df_tickers['ticker'] = df_tickers['ticker'].astype(str)
         df_tickers.drop_duplicates(inplace=True)
@@ -63,21 +66,27 @@ class DataComparison:
         df_te = pd.concat([df_tickers, df_exch], axis=1).reset_index()
         self.df_pp = self.df_pp.merge(df_te, how='left', on='iconum', suffixes=('_drop', ''))
         self.df_pp.drop(columns=['ticker_drop', 'exchange_drop'], inplace=True)
-        self.df_pp.drop_duplicates(inplace=True)
         self.df_pp = self.df_pp[['iconum', 'Company Name', 'master_deal', 'client_deal_id', 'ticker', 'exchange',
                                  'Price', 'min_offering_price', 'max_offering_price', 'announcement_date',
                                  'pricing_date', 'trading_date', 'closing_date', 'deal_status',
                                  'last_updated_date_utc']]
+        self.df_pp.sort_values('last_updated_date_utc', ascending=False, inplace=True)
+        self.df_pp.drop_duplicates(subset=['iconum', 'master_deal'], inplace=True)
 
     def compare(self):
+        # merge data from sources with entities data
         df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'entityName', 'iconum']], how='left')
-        # for Chinese Exchanges, get the English name if possible
-        cn_exch = ['Shenzhen Stock Exchange', 'Shanghai Stock Exchange']
+        # for Chinese Exchanges, get the English name from concordance API if possible
+        cn_exch = ['Shenzhen Stock Exchange', 'Shanghai Stock Exchange', 'Shanghai', 'Shenzhen']
         df_m.loc[(df_m['Market'].isin(cn_exch)) & ~df_m['entityName'].isna(), 'Company Name'] = df_m['entityName']
+        # ToDo: for Chinese companies, get iconum from PEO-PIPE data if ticker matches
+        # pp_cn = self.df_pp.loc[(self.df_pp['exchange'].isin(cn_exch)) & (~self.df_pp['ticker'].isna())]
+        # pp_cn = pp_cn[['iconum', 'Company Name', 'ticker']]
+        # self.concatenate_ticker_exchange()
         df_m = pd.merge(df_m, self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
         for c in [col for col in df_m.columns if 'date' in col.lower()]:
-            df_m[c] = pd.to_datetime(df_m[c], errors='coerce').dt.date
+            df_m[c] = pd.to_datetime(df_m[c].fillna(pd.NaT), errors='coerce').dt.date
         df_m['IPO Dates Match'] = df_m['IPO Date'] == df_m['trading_date']
         df_m['IPO Prices Match'] = df_m['Price_external'] == df_m['Price_fds']
         df_m.loc[df_m['Price_external'].isna(), 'IPO Prices Match'] = True
@@ -102,14 +111,15 @@ class DataComparison:
 
 
 def main():
+    logger.info("Comparing external data with data collected internally")
     dc = DataComparison()
     try:
         dc.concatenate_ticker_exchange()
         return dc.compare()
     except Exception as e:
-        print(e)
         logger.error(e, exc_info=sys.exc_info())
         logger.info('-' * 100)
+        error_email(str(e))
 
 
 if __name__ == '__main__':
