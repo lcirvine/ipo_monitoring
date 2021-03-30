@@ -228,12 +228,12 @@ sources_dict = {
     'Euronext': {
         'exchange': 'Euronext',
         'rank': 5,
-        'location': 'Multiple',
+        'location': ', '.join(['Amsterdam', 'Brussels', 'Dublin', 'Lisbon', 'London', 'Oslo', 'Paris']),
         # ['Amsterdam', 'Brussels', 'Dublin', 'Lisbon', 'London', 'Oslo', 'Paris'],
         'url': 'https://live.euronext.com/en/ipo-showcase',
         'table_num': 0,
         'table_elem': 'table',
-        # 'table_attrs': {'class': ['table', 'views-table', 'views-view-table', 'cols-5']},
+        'table_attrs': {'class': ['table', 'views-table', 'views-view-table', 'cols-5']},
         'row_elem': 'tr',
         # 'row_attrs': {},
         'cell_elem': 'td',
@@ -645,7 +645,8 @@ sources_dict = {
     'NasdaqNordic': {
         'exchange': 'Multiple',
         'rank': None,
-        'location': 'Multiple',  # ['Copenhagen', 'Helsinki', 'Iceland', 'Stockholm']
+        'location': ', '.join(['Copenhagen', 'Helsinki', 'Iceland', 'Stockholm']),
+        # ['Copenhagen', 'Helsinki', 'Iceland', 'Stockholm']
         'url': 'http://www.nasdaqomxnordic.com/',
         'table_num': 2,
         'table_elem': 'table',

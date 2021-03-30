@@ -1,7 +1,9 @@
 import os
 import sys
+import re
+import shutil
 from datetime import datetime, timedelta
-from logging_ipo_dates import logger, error_email
+from logging_ipo_dates import logger, log_folder, log_file
 
 
 def delete_old_files(folder: str, num_days: int = 30) -> list:
@@ -21,7 +23,7 @@ def delete_old_files(folder: str, num_days: int = 30) -> list:
                 os.unlink(f_abs)
                 files_deleted.append(file)
     if len(files_deleted) > 0:
-        logger.info(f"Deleted {files_deleted}")
+        logger.info(f"Deleted {', '.join(files_deleted)}")
     return files_deleted
 
 
@@ -42,18 +44,38 @@ def delete_old_files_test(folder: str, num_days: int = 30) -> list:
                 print(f_abs)
                 files_deleted.append(file)
     if len(files_deleted) > 0:
-        print(f"Deleted {files_deleted}")
+        print(f"Deleted {', '.join(files_deleted)}")
     return files_deleted
 
 
+def archive_logs(num_days: int = 30):
+    current_log_file = os.path.join(log_folder, log_file)
+    with open(current_log_file, 'r') as f:
+        all_lines = f.readlines()
+    key_dates = {'first_log_date': return_date_str(all_lines[0]), 'last_log_date': return_date_str(all_lines[-1])}
+    old_date = datetime.utcnow() - timedelta(days=num_days)
+    if key_dates.get('first_log_date') is not None:
+        first_log_date_datetime = datetime.strptime(key_dates.get('first_log_date'), '%Y-%m-%d')
+        if first_log_date_datetime < old_date:
+            log_file_name, log_file_ext = os.path.splitext(log_file)
+            archived_log = f"{log_file_name} {key_dates.get('first_log_date')} - {key_dates.get('last_log_date', datetime.today().strftime('%Y-%m-%d'))}{log_file_ext}"
+            shutil.move(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
+
+
+def return_date_str(text: str, date_pat: str = r"(\d{4}\-\d{2}\-\d{2})"):
+    mo = re.search(date_pat, text)
+    if mo is not None:
+        return mo.group()
+
+
 def main():
-    for folder in [os.path.join(os.getcwd(), f) for f in ['Results', 'Logs']]:
-        try:
+    try:
+        for folder in [os.path.join(os.getcwd(), 'Reference', 'Entity Mapping Requests'),
+                       os.path.join(os.getcwd(), 'Logs', 'Screenshots')]:
             delete_old_files(folder)
-        except Exception as e:
-            logger.error(e, exc_info=sys.exc_info())
-            error_email(str(e))
-            logger.info('-' * 100)
+            archive_logs()
+    except Exception as e:
+        logger.error(e, exc_info=sys.exc_info())
 
 
 if __name__ == '__main__':
