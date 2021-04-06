@@ -86,7 +86,11 @@ class DataComparison:
         df_m = pd.merge(df_m, self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
         for c in [col for col in df_m.columns if 'date' in col.lower()]:
-            df_m[c] = pd.to_datetime(df_m[c].fillna(pd.NaT), errors='coerce').dt.date
+            # intermittently getting InvalidIndexError: Reindexing only valid with uniquely valued Index objects
+            try:
+                df_m[c] = pd.to_datetime(df_m[c].fillna(pd.NaT), errors='coerce').dt.date
+            except Exception as e:
+                logger.error(f"{c} - {e}")
         df_m['IPO Dates Match'] = df_m['IPO Date'] == df_m['trading_date']
         df_m['IPO Prices Match'] = df_m['Price_external'] == df_m['Price_fds']
         df_m.loc[df_m['Price_external'].isna(), 'IPO Prices Match'] = True

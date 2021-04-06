@@ -6,6 +6,7 @@ import data_transformation
 import entity_mapping
 import data_comparison
 import email_report
+import file_management
 
 logger.info('-' * 100)
 source_reference.main()
@@ -15,4 +16,5 @@ entity_mapping.main()
 df_summary = data_comparison.main()
 email_report.main(file_attachment=os.path.join(os.getcwd(), 'Results', 'IPO Monitoring.xlsx'),
                   addtl_message=df_summary.to_html(na_rep="", index=False, justify="left"))
+file_management.main()
 logger.info('-' * 100)

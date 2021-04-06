@@ -122,7 +122,6 @@ class WebDriver:
         table_data = []
         for row in table.find_all(row_elem):
             cells = [c.text.strip() for c in row.find_all(cell_elem)]
-            # table_data.append(row.stripped_strings)
             if get_links and link_elem is not None and link_key is not None:
                 for link in row.find_all(link_elem):
                     cells.append(link[link_key])
@@ -276,6 +275,10 @@ class WebDriver:
             ss = [col for col in df.columns.to_list() if col not in exclude_col]
         else:
             ss = df.columns.to_list()
+        # I want to preserve when this item was first added to the website
+        # so sorting by earliest first, then dropping duplicates for subset which doesn't include time_checked
+        if 'time_checked' in df.columns:
+            df.sort_values(by='time_checked', inplace=True)
         df.drop_duplicates(subset=ss, inplace=True)
         return df
 

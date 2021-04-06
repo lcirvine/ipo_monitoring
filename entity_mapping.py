@@ -8,7 +8,7 @@ from time import sleep
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from configparser import ConfigParser
-from logging_ipo_dates import logger, error_email
+from logging_ipo_dates import logger, error_email, log_folder
 
 pd.options.mode.chained_assignment = None
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -53,15 +53,21 @@ class EntityMatchBulk:
                 file_data = {'inputFile': (self.file_name + '.csv', f, 'text/csv')}
                 entity_task_response = requests.post(url=entity_task_endpoint, data=entity_task_request,
                                                      auth=self.authorization, files=file_data, headers=self.headers)
-            entity_task_data = json.loads(entity_task_response.text)
-            eid = entity_task_data['data']['taskId']
-            task_name = entity_task_data['data']['taskName']  # will be file_name provided in entity task request
-            logger.info(f"Entity mapping request submitted - task ID {eid} - task name {task_name}")
-            task_status = self.get_task_status(eid)
-            logger.info(f"Task {eid} status - {task_status}")
-            if task_status == 'SUCCESS':
-                df_result = self.get_entity_decisions(eid)
-                self.formatting_and_saving(df_result)
+            assert entity_task_response.ok, f"{entity_task_response.status_code} - {entity_task_response.text}"
+            # temporarily saving entity task response to look into errors
+            # getting Bad Request - Number of elements in the header doesn't match the total number of columns
+            with open(os.path.join(log_folder, 'Concordance API Responses', f"API response for {self.file_name}.txt"), 'w', encoding='utf8') as f:
+                json.dump(entity_task_response.text, f, ensure_ascii=False)
+            if entity_task_response.text is not None and entity_task_response.text != '':
+                entity_task_data = json.loads(entity_task_response.text)
+                eid = entity_task_data['data']['taskId']
+                task_name = entity_task_data['data']['taskName']  # will be file_name provided in entity task request
+                logger.info(f"Entity mapping request submitted - task ID {eid} - task name {task_name}")
+                task_status = self.get_task_status(eid)
+                logger.info(f"Task {eid} status - {task_status}")
+                if task_status == 'SUCCESS':
+                    df_result = self.get_entity_decisions(eid)
+                    self.formatting_and_saving(df_result)
         else:
             logger.info(f"File not found - {self.file}")
 
@@ -81,6 +87,7 @@ class EntityMatchBulk:
             return self.get_task_status(eid, recheck_count)
         else:
             logger.info(f"Duration for Concordance API {entity_task_status_data['data'][0]['processDuration']}")
+            logger.info(f"Decision Rate for Concordance API {entity_task_status_data['data'][0]['decisionRate']}")
             return task_status
 
     def get_entity_decisions(self, eid):
@@ -99,7 +106,6 @@ class EntityMatchBulk:
         drop_cols = ['url', 'stateCode', 'stateName', 'sicCode', 'entitySubTypeCode', 'locationCity', 'regionName',
                      'factsetIndustryCode', 'factsetIndustryName', 'factsetSectorCode', 'factsetSectorName',
                      'parentName', 'parentMatchFlag', 'nameMatchString', 'nameMatchSource']
-        # ToDo: drop rows with confidence below a certain threshold, say .60
         df.drop(columns=drop_cols, inplace=True, errors='ignore')
         df.sort_values(by=['matchFlag', 'similarityScore'], ascending=False, inplace=True)
         df.drop_duplicates(subset=['clientName'], inplace=True)
@@ -117,6 +123,10 @@ class EntityMatchBulk:
         final_cols = ['Company Name', 'Symbol', 'Market', 'entityName', 'iconum', 'entity_id', 'mapStatus',
                       'similarityScore', 'confidenceScore', 'countryName', 'entityTypeDescription']
         df = df[final_cols]
+        # rows with confidence below .60 should be not be considered matches
+        df.loc[df['confidenceScore'] <= .60, 'mapStatus'] = 'UNMAPPED'
+        df.loc[df['confidenceScore'] <= .60, ['entityName', 'iconum', 'entity_id', 'similarityScore', 'confidenceScore',
+                                              'countryName', 'entityTypeCode', 'entityTypeDescription']] = np.nan
         # ToDo: should entity mapping be csv so that I can just append to existing file?
         if os.path.exists(self.entity_mapping_file):
             df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)

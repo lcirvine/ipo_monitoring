@@ -71,7 +71,8 @@ def return_date_str(text: str, date_pat: str = r"(\d{4}\-\d{2}\-\d{2})"):
 def main():
     try:
         for folder in [os.path.join(os.getcwd(), 'Reference', 'Entity Mapping Requests'),
-                       os.path.join(os.getcwd(), 'Logs', 'Screenshots')]:
+                       os.path.join(os.getcwd(), 'Logs', 'Screenshots'),
+                       os.path.join(os.getcwd(), 'Logs', 'Concordance API Responses')]:
             delete_old_files(folder)
             archive_logs()
     except Exception as e:

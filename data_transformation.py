@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-from datetime import date
+from datetime import date, datetime
 from logging_ipo_dates import logger, error_email
 
 pd.options.mode.chained_assignment = None
@@ -11,7 +11,7 @@ pd.options.mode.chained_assignment = None
 class DataTransformation:
     def __init__(self):
         self.source_folder = os.path.join(os.getcwd(), 'Data from Sources')
-        self.final_cols = ['Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 'Status', 'Notes', 'time_checked', ]
+        self.final_cols = ['Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 'Status', 'Notes', 'time_checked']
         self.df_all = pd.DataFrame(columns=self.final_cols)
         self.result_folder = os.path.join(os.getcwd(), 'Results')
         if not os.path.exists(self.result_folder):
@@ -36,70 +36,80 @@ class DataTransformation:
             df[c] = pd.to_datetime(df[c].fillna(pd.NaT), errors='coerce', dayfirst=dayfirst)
         return df
 
-    def nyse(self):
-        # ToDo: combine data from all US sources
-        file_name = 'NYSE'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_up = self.src_dfs.get(file_name).copy()
-        df_up = self.format_date_cols(df_up, ['Expected Date', 'time_checked'])
-        # NYSE provides the expected pricing date, the expected listing date is one day after
-        df_up.loc[df_up['Expected Date'] >= pd.to_datetime('today'), 'Notes'] = 'Price expected ' + df_up['Expected Date'].astype(str)
-        df_up['IPO Date'] = df_up['Expected Date'] + pd.offsets.DateOffset(days=1)
-        df_up.rename(columns={'Curr. File Price/Range($)': 'Price Range'}, inplace=True)
+    def us(self):
 
-        file_name = 'NYSE Withdrawn'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_wd = self.src_dfs.get(file_name).copy()
-        df_wd = self.format_date_cols(df_wd, ['Date W/P', 'time_checked'])
-        df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date W/P'].astype(str)
-        df_wd['Exchange'] = 'NYSE'
+        def nyse():
+            file_name = 'NYSE'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df_up = self.src_dfs.get(file_name).copy()
+            df_up = self.format_date_cols(df_up, ['Expected Date', 'time_checked'])
+            # NYSE provides the expected pricing date, the expected listing date is one day after
+            df_up['IPO Date'] = df_up['Expected Date'] + pd.offsets.DateOffset(days=1)
+            df_up.rename(columns={'Curr. File Price/Range($)': 'Price Range'}, inplace=True)
 
-        df = pd.concat([df_up, df_wd], ignore_index=True, sort=False)
-        df.rename(columns={'Issuer': 'Company Name', 'Ticker': 'Symbol', 'Exchange': 'Market'}, inplace=True)
-        self.append_to_all(df)
+            file_name = 'NYSE Withdrawn'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df_wd = self.src_dfs.get(file_name).copy()
+            df_wd = self.format_date_cols(df_wd, ['Date W/P', 'time_checked'])
+            df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date W/P'].astype(str)
+            df_wd['Exchange'] = 'NYSE'
 
-    def nasdaq(self):
-        file_name = 'Nasdaq'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_up = self.src_dfs.get(file_name).copy()
-        df_up = self.format_date_cols(df_up, ['Expected IPO Date', 'time_checked'])
-        df_up.rename(columns={'Exchange/ Market': 'Market', 'Expected IPO Date': 'IPO Date'}, inplace=True)
-        df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price Range'] = df_up['Price']
-        df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price'] = np.nan
-        # pricing is expected the day before the IPO
-        df_up.loc[df_up['IPO Date'] >= pd.to_datetime('today'), 'Notes'] = 'Price expected ' + (
-                    df_up['IPO Date'] - pd.offsets.DateOffset(days=1)).astype(str)
+            df = pd.concat([df_up, df_wd], ignore_index=True, sort=False)
+            df.rename(columns={'Issuer': 'Company Name', 'Ticker': 'Symbol', 'Exchange': 'Market'}, inplace=True)
+            return df
 
-        file_name = 'Nasdaq Priced'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_p = self.src_dfs.get(file_name).copy()
-        df_p = self.format_date_cols(df_p, ['Date', 'time_checked'])
-        df_p.rename(columns={'Exchange/ Market': 'Market', 'Date': 'IPO Date', 'Actions': 'Status'}, inplace=True)
+        def nasdaq():
+            file_name = 'Nasdaq'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df_up = self.src_dfs.get(file_name).copy()
+            df_up = self.format_date_cols(df_up, ['Expected IPO Date', 'time_checked'])
+            df_up.rename(columns={'Exchange/ Market': 'Market', 'Expected IPO Date': 'IPO Date'}, inplace=True)
+            df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price Range'] = df_up['Price']
+            df_up.loc[df_up['Price'].str.contains('-', na=False), 'Price'] = np.nan
 
-        file_name = 'Nasdaq Withdrawn'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df_wd = self.src_dfs.get(file_name).copy()
-        df_wd = self.format_date_cols(df_wd, ['Date Filed', 'Date Withdrawn', 'time_checked'])
-        df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date Withdrawn'].astype(str)
-        df_wd['Status'] = 'Withdrawn'
-        df_wd['Market'] = 'Nasdaq'
+            file_name = 'Nasdaq Priced'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df_p = self.src_dfs.get(file_name).copy()
+            df_p = self.format_date_cols(df_p, ['Date', 'time_checked'])
+            df_p.rename(columns={'Exchange/ Market': 'Market', 'Date': 'IPO Date', 'Actions': 'Status'}, inplace=True)
 
-        df = pd.concat([df_up, df_p, df_wd], ignore_index=True, sort=False)
-        self.append_to_all(df)
+            file_name = 'Nasdaq Withdrawn'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df_wd = self.src_dfs.get(file_name).copy()
+            df_wd = self.format_date_cols(df_wd, ['Date Filed', 'Date Withdrawn', 'time_checked'])
+            df_wd['Notes'] = 'Withdrawn on ' + df_wd['Date Withdrawn'].astype(str)
+            df_wd['Status'] = 'Withdrawn'
+            df_wd['Market'] = 'Nasdaq'
 
-    def iposcoop(self):
-        file_name = 'IPOScoop'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df['IPO Date'] = df['Expected to Trade'].str.extract(r'(\d{1,2}/\d{1,2}/\d{4})')
-        df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
-        df['Status'] = df['Expected to Trade'].str.extract(r'(Priced|Postponed)')
-        df.loc[df['Price Low'] != df['Price High'], 'Price Range'] = df['Price Low'].astype(str) + ' - ' + df['Price High'].astype(str)
-        df.loc[df['Price Low'] == df['Price High'], 'Price'] = df['Price High']
-        # ToDo: make the week of date the end of the week
-        df['Notes'] = df['Expected to Trade'].str.extract(r'(Week of)')
-        df['Market'] = 'IPOScoop'
-        df.rename(columns={'Company': 'Company Name', 'Symbol proposed': 'Symbol'}, inplace=True)
+            df = pd.concat([df_up, df_p, df_wd], ignore_index=True, sort=False)
+            return df
+
+        def iposcoop():
+            # no longer calling iposcoop because the data was unreliable
+            # if I do start using it again, it needs to be combined with the other US exchange sites
+            file_name = 'IPOScoop'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df = self.src_dfs.get(file_name).copy()
+            df['IPO Date'] = df['Expected to Trade'].str.extract(r'(\d{1,2}/\d{1,2}/\d{4})')
+            df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
+            df['Status'] = df['Expected to Trade'].str.extract(r'(Priced|Postponed)')
+            df.loc[df['Price Low'] != df['Price High'], 'Price Range'] = df['Price Low'].astype(str) + ' - ' + df[
+                'Price High'].astype(str)
+            df.loc[df['Price Low'] == df['Price High'], 'Price'] = df['Price High']
+            # ToDo: make the week of date the end of the week
+            df['Notes'] = df['Expected to Trade'].str.extract(r'(Week of)')
+            df['Market'] = 'IPOScoop'
+            df.rename(columns={'Company': 'Company Name', 'Symbol proposed': 'Symbol'}, inplace=True)
+            return df
+
+        df_ny = nyse()
+        df_nd = nasdaq()
+        # df_is = iposcoop()
+        df = pd.concat([df_ny, df_nd], ignore_index=True, sort=False)
+        df.sort_values(by=['time_checked'], ascending=False, inplace=True)
+        df.drop_duplicates(subset=['Company Name', 'Symbol'], inplace=True)
+        df.loc[df['IPO Date'] >= pd.to_datetime('today'), 'Notes'] = 'Price expected ' + (
+                df['IPO Date'] - pd.offsets.DateOffset(days=1)).astype(str)
         self.append_to_all(df)
 
     def av(self):
@@ -140,17 +150,60 @@ class DataTransformation:
         df.drop_duplicates()
         self.append_to_all(df)
 
-    def shanghai(self):
-        file_name = 'Shanghai'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Subscription Date', 'Announcement Day of Winning Results', 'Listing date',
-                                        'time_checked'])
-        df['Company Name'] = df['New Share Name'].str.extract(r'^(\w*)\s')
-        df['Symbol'] = df['Company Name'].str.extract(r'\w(\d*)\b')
-        df['Company Name'] = df['Company Name'].str.replace(r'\w(\d*)\b', '', regex=True)
-        df['Market'] = 'Shanghai Stock Exchange'
-        df.rename(columns={'Listing date': 'IPO Date', 'Issue price': 'Price'}, inplace=True)
+    def cn(self):
+
+        def shanghai():
+            file_name = 'Shanghai'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df = self.src_dfs.get(file_name).copy()
+            df = self.format_date_cols(df, ['Subscription Date', 'Announcement Day of Winning Results', 'Listing date',
+                                            'time_checked'])
+            df['Company Name'] = df['New Share Name'].str.extract(r'^(\w*)\s')
+            df['Symbol'] = df['Company Name'].str.extract(r'\w(\d*)\b')
+            df['Symbol'] = df['Symbol'].astype(str)
+            df['Company Name'] = df['Company Name'].str.replace(r'\w(\d*)\b', '', regex=True)
+            df['Market'] = 'Shanghai Stock Exchange'
+            df.rename(columns={'Listing date': 'IPO Date', 'Issue price': 'Price'}, inplace=True)
+            return df
+
+        def cninfo():
+            file_name = 'CNInfo'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df = self.src_dfs.get(file_name).copy()
+            df = self.format_date_cols(df, ['Listing date', 'Release date', 'time_checked'])
+            df['Market'] = 'Shenzhen Stock Exchange'
+            df.rename(columns={'Code': 'Symbol', 'Abbreviation': 'Company Name', 'Issue price': 'Price',
+                               'Listing date': 'IPO Date'}, inplace=True)
+            df['Symbol'] = df['Symbol'].astype(str)
+            return df
+
+        def eastmoney():
+            file_name = 'East Money'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df = self.src_dfs.get(file_name).copy()
+            df.replace('-', np.nan, inplace=True)
+            df = self.format_date_cols(df, ['time_checked'])
+            df['Symbol'] = df['Symbol'].astype(str)
+            # date is provided as mm-dd, adding current year to make the date formatted as mm-dd-yyyy
+            df['IPO Date'] = df['IPO Date'] + f"-{datetime.now().year}"
+            df['IPO Date'] = pd.to_datetime(df['IPO Date'], errors='coerce').dt.date
+            # at the beginning of the year, the calendar will still show IPOs from last year
+            # adding the current year to that previous date will be incorrect
+            # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
+            # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
+            df.loc[df['IPO Date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'IPO Date'] = df['IPO Date'] - pd.offsets.DateOffset(years=1)
+            return df
+
+        df_sh = shanghai()
+        df_sz = cninfo()
+        df = pd.concat([df_sh, df_sz], ignore_index=True, sort=False)
+        df_em = eastmoney()
+        df_em.sort_values(by=['time_checked'], ascending=False, inplace=True)
+        df_em.drop_duplicates(subset=['Symbol'], inplace=True)
+        df = pd.merge(df, df_em[['Symbol', 'IPO Date']], how='left', on='Symbol', suffixes=('_exch', '_em'))
+        df['IPO Date'] = df['IPO Date_exch'].fillna(df['IPO Date_em'])
+        df.sort_values(by=['time_checked'], ascending=False, inplace=True)
+        df.drop_duplicates(subset=['Company Name', 'Symbol'], inplace=True)
         self.append_to_all(df)
 
     def euronext(self):
@@ -183,16 +236,6 @@ class DataTransformation:
         df = self.format_date_cols(df, ['Expected first date of trading', 'time_checked'])
         df['Market'] = 'London Stock Exchange ' + df['Market'].fillna('')
         df.rename(columns={'Name': 'Company Name', 'Expected first date of trading': 'IPO Date', 'Price range': 'Price Range'}, inplace=True)
-        self.append_to_all(df)
-
-    def cninfo(self):
-        file_name = 'CNInfo'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Listing date', 'Release date', 'time_checked'])
-        df['Market'] = 'Shenzhen Stock Exchange'
-        df.rename(columns={'Code': 'Symbol', 'Abbreviation': 'Company Name', 'Issue price': 'Price',
-                           'Listing date': 'IPO date'}, inplace=True)
         self.append_to_all(df)
 
     def bstsx(self):
@@ -366,6 +409,8 @@ class DataTransformation:
         self.append_to_all(df)
 
     def formatting_all(self):
+        # removing commas from company name - Concordance API will interpret those as new columns
+        self.df_all['Company Name'] = self.df_all['Company Name'].str.replace(',', '')
         self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
         self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status'].fillna('')
         self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today'
@@ -394,15 +439,12 @@ def main():
     logger.info("Combining all the data from external sources together")
     dt = DataTransformation()
     try:
-        dt.nyse()
-        dt.nasdaq()
-        # dt.iposcoop()
+        dt.us()
         dt.jpx()
-        dt.shanghai()
+        dt.cn()
         dt.euronext()
         dt.aastocks()
         dt.lse()
-        dt.cninfo()
         dt.bstsx()
         dt.bstsxv()
         dt.tsx()
@@ -418,7 +460,6 @@ def main():
         dt.spotlight()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
-        logger.info('-' * 100)
         error_email(str(e))
     finally:
         dt.formatting_all()
