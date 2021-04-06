@@ -691,6 +691,50 @@ sources_dict = {
             'Document'
         ],
         'file': 'Spotlight'
+    },
+    'East Money': {
+        'exchange': ', '.join(['Shanghai Stock Exchange', 'Shenzhen Stock Exchange']),
+        'rank': 6,
+        'location': ', '.join(['Shanghai', 'Shenzhen']),
+        'url': 'http://data.eastmoney.com/xg/xg/default.html',
+        'table_num': 1,
+        'table_elem': 'table',
+        # 'table_attrs': {'attr_key': 'attr_value'},
+        'row_elem': 'tr',
+        # 'row_attrs': {'attr_key': 'attr_value'},
+        'cell_elem': 'td',
+        # 'cell_attrs': {'attr_key': 'attr_value'},
+        # 'header_elem': 'th',
+        # 'header_attrs': {'attr_key': 'attr_value'},
+        # 'link_elem': 'a',
+        'link_key': 'href',
+        'columns': [
+            'Symbol',
+            'Company Name',
+            'Relevant information',
+            'Subscription code',
+            'Total issuance (ten thousand shares)',
+            'Online issuance (10,000 shares)',
+            'Top grid subscription needs to be equipped with market value (ten thousand yuan)',
+            'Subscription limit (10,000 shares)',
+            'Price',
+            'Latest price',
+            'Close price of the first day',
+            'Subscription Date',
+            'Announcement date of winning number',
+            'Successful payment date',
+            'IPO Date',
+            'Issue price-earnings ratio',
+            'Industry P/E ratio',
+            'Success rate (%)',
+            'Inquiry Cumulative Quotation Multiple',
+            'The number of quotations for allotment objects',
+            'Number of consecutive word boards',
+            'Increase %',
+            'Profit for every first draw (yuan)',
+            'Prospectus/Expression of Intent'
+        ],
+        'file': 'East Money'
     }
 }
 

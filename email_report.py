@@ -40,8 +40,6 @@ def main(file_attachment: str, addtl_message: str = ''):
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))
-    finally:
-        logger.info('-' * 100)
 
 
 if __name__ == '__main__':

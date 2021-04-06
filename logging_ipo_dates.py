@@ -36,7 +36,7 @@ def error_email(error_message: str = ''):
     mail.Sender = config.get('Email', 'Sender')
     mail.Subject = f"ERROR: {config.get('Email', 'Subject')} {today_date}"
     mail.HTMLBody = config.get('Email', 'ErrorBody') + error_message + config.get('Email', 'Signature')
-    mail.Attachments.Add(log_file)
+    mail.Attachments.Add(os.path.join(log_folder, log_file))
     mail.Send()
 
 
