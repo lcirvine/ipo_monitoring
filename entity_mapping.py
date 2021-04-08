@@ -27,12 +27,16 @@ class EntityMatchBulk:
         self.authorization = (self.config.get('FDSAPI', 'USERNAME-SERIAL'), self.config.get('FDSAPI', 'API-Key'))
         self.headers = {'Accept': 'application/json;charset=utf-8'}
 
-    def create_csv(self):
+    def create_csv(self, recheck_all: bool = False):
         # create a dataframe of all company names without iconums including new names found
         df_e = pd.read_excel(self.entity_mapping_file, usecols=['Company Name', 'iconum', 'entity_id', 'mapStatus'])
-        df = pd.merge(self.df_s, df_e, how='left', on='Company Name')
-        # only checking 1. company names that aren't null 2. don't have an iconum and 3. haven't been checked yet
-        df = df.loc[~df['Company Name'].isna() & df['iconum'].isna() & df['mapStatus'].isna()]
+        df = pd.merge(self.df_s, df_e, how='outer', on='Company Name')
+        if recheck_all:
+            # checking 1. company names that aren't null 2. don't have an iconum
+            df = df.loc[~df['Company Name'].isna() & df['iconum'].isna()]
+        else:
+            # only checking 1. company names that aren't null 2. don't have an iconum and 3. haven't been checked yet
+            df = df.loc[~df['Company Name'].isna() & df['iconum'].isna() & df['mapStatus'].isna()]
         df = df.drop_duplicates()
         logger.info(f"{len(df)} unmapped entities")
         # save that dataframe to a csv encoded as utf8

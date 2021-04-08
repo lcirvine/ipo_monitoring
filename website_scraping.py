@@ -62,40 +62,6 @@ class WebDriver:
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         return soup
 
-    def check_tables_in_sources(self, result_file: str = 'tables in sources') -> None:
-        """
-        This function is used for testing. It will create a JSON file with data about all the sites in the sources.ini
-        file, including the number of tables, their attributes, the number of rows and the column names.
-        :param result_file: Name of the JSON file that will be created.
-        :return: None. The data is saved in a file.
-        """
-        dict_all_sources = {}
-        for k, v in self.sources_dict.items():
-            try:
-                dict_source = {'source': k}
-                url = v.get('url')
-                if url != '':
-                    dict_source['url'] = url
-                    self.load_url(url)
-                    soup = self.return_soup()
-                    tables = soup.find_all('table')
-                    dict_source['num_tables'] = len(tables)
-                    dict_source['tables'] = {}
-                    tbl_ct = 0
-                    for table in tables:
-                        dict_source['tables'][tbl_ct] = {'attrs': table.attrs,
-                                                         'rows': len(table.find_all('tr')),
-                                                         'columns': [col.text.strip() for col in table.find_all('th')],
-                                                         'text': table.text}
-                        tbl_ct += 1
-                dict_all_sources[k] = dict_source
-            except Exception as e:
-                print(f"{k} ERROR:\n{e}")
-                pass
-        self.driver.close()
-        with open(result_file + '.json', 'w') as f:
-            json.dump(dict_all_sources, f)
-
     def parse_table(self, get_links: bool = False, **kwargs) -> pd.DataFrame:
         """
         Parses the element identified by the keyword arguments and returns a pandas dataframe
@@ -268,18 +234,18 @@ class WebDriver:
                             Can be given either as a list of columns or a string with the column name.
         :return: DataFrame
         """
-        df = pd.concat([old_df, new_df], ignore_index=True, sort=False)
+        df = pd.concat([old_df, new_df.astype(old_df.dtypes)], ignore_index=True, sort=False)
         if exclude_col and isinstance(exclude_col, str):
             ss = [col for col in df.columns.to_list() if col != exclude_col]
         elif exclude_col and isinstance(exclude_col, list):
             ss = [col for col in df.columns.to_list() if col not in exclude_col]
         else:
             ss = df.columns.to_list()
-        # I want to preserve when this item was first added to the website
-        # so sorting by earliest first, then dropping duplicates for subset which doesn't include time_checked
+        # I want to preserve when this item was first added to the website and have most recent updates at the top so
+        # sorting by most recent time_checked, dropping duplicates for subset of columns and keeping the last (earliest)
         if 'time_checked' in df.columns:
-            df.sort_values(by='time_checked', inplace=True)
-        df.drop_duplicates(subset=ss, inplace=True)
+            df.sort_values(by='time_checked', ascending=False, inplace=True)
+        df.drop_duplicates(subset=ss, keep='last', inplace=True)
         return df
 
     def save_webscraping_results(self):
@@ -310,7 +276,6 @@ def main():
                 df.to_csv(s_file, index=False, encoding='utf-8-sig')
                 wd.webscraping_results.append([wd.time_checked_str, k, 1])
         except Exception as e:
-            # ToDo: If there's an exception, the key is the NEXT key rather than the one that threw the exception. Why?
             logger.error(f"ERROR for {k}")
             logger.error(e, exc_info=sys.exc_info())
             logger.info('-' * 100)

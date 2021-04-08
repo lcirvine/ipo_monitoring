@@ -410,7 +410,7 @@ class DataTransformation:
 
     def formatting_all(self):
         # removing commas from company name - Concordance API will interpret those as new columns
-        self.df_all['Company Name'] = self.df_all['Company Name'].str.replace(',', '')
+        self.df_all['Company Name'] = self.df_all['Company Name'].str.replace(',', '', regex=False)
         self.df_all = self.format_date_cols(self.df_all, ['IPO Date', 'time_checked'])
         self.df_all.loc[self.df_all['IPO Date'].dt.date > date.today(), 'Status'] = 'Upcoming ' + self.df_all['Status'].fillna('')
         self.df_all.loc[self.df_all['IPO Date'].dt.date == date.today(), 'Status'] = 'Listing Today'
