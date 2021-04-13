@@ -1,0 +1,18 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+*.ini
+*.xml
+*.iml
+*.xlsx
+*.csv
+*.bat
+*.log
+*.json
+.idea/
+No Longer Needed/
+Logs/
+Data from Sources/
+Backfill/
+Reference/
+Results/
