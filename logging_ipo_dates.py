@@ -41,5 +41,5 @@ def error_email(error_message: str = ''):
 
 
 def consolidate_webscraping_results():
-    # ToDo: review webscraping results to see how the webscraper is performing
+    # TODO: review webscraping results to see how the webscraper is performing
     pass

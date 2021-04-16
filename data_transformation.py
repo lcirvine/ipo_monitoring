@@ -85,8 +85,6 @@ class DataTransformation:
             return df
 
         def iposcoop():
-            # no longer calling iposcoop because the data was unreliable
-            # if I do start using it again, it needs to be combined with the other US exchange sites
             file_name = 'IPOScoop'
             assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
             df = self.src_dfs.get(file_name).copy()
@@ -96,31 +94,61 @@ class DataTransformation:
             df.loc[df['Price Low'] != df['Price High'], 'Price Range'] = df['Price Low'].astype(str) + ' - ' + df[
                 'Price High'].astype(str)
             df.loc[df['Price Low'] == df['Price High'], 'Price'] = df['Price High']
-            # ToDo: make the week of date the end of the week
-            df['Notes'] = df['Expected to Trade'].str.extract(r'(Week of)')
+            # dropping 'week of' dates because they're just not accurate enough
+            # df['Notes'] = df['Expected to Trade'].str.extract(r'(Week of)')
+            df = df.loc[~df['Expected to Trade'].str.contains('Week of')]
             df['Market'] = 'IPOScoop'
             df.rename(columns={'Company': 'Company Name', 'Symbol proposed': 'Symbol'}, inplace=True)
             return df
 
+        def av():
+            file_name = 'AlphaVantage-US'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df = self.src_dfs.get(file_name).copy()
+            df = self.format_date_cols(df, ['ipoDate', 'time_checked'])
+            df.loc[(df['priceRangeLow'] != df['priceRangeHigh']) &
+                   (df['priceRangeLow'] != 0), 'Price Range'] = df['priceRangeLow'].astype(str) + ' - ' + df['priceRangeHigh'].astype(str)
+
+            df.loc[(df['priceRangeLow'] == df['priceRangeHigh']) & (df['priceRangeLow'] != 0), 'Price'] = df['priceRangeHigh']
+            # When listing an ETF, warrants or rights both price high and price low will be 0. Those should be dropped.
+            # However, direct listings will also have price high and low at 0.
+            # TODO: keep only direct listings but drop all other rows where price high and low both equal 0
+            # The problem is that when units split into shares and warrants, those will also have 0 as price range
+            # and the asset type will still be shares. Those should be dropped as well.
+            df.drop(df.loc[(df['priceRangeLow'] == 0) & (df['priceRangeHigh'] == 0)].index, inplace=True)
+            df.rename(columns={'name': 'Company Name', 'symbol': 'Symbol', 'ipoDate': 'IPO Date', 'exchange': 'Market',
+                               'assetType': 'Notes'}, inplace=True)
+            return df
+
         df_ny = nyse()
         df_nd = nasdaq()
-        # df_is = iposcoop()
+        df_is = iposcoop()
+        df_av = av()
         df = pd.concat([df_ny, df_nd], ignore_index=True, sort=False)
+
+        # Add iposcoop and av only when there is not already a row from one of the exchanges
+        # company names are often different so joining on symbol after removing special characters
+        special_chars = r"(\.|'|\*)"
+        df['formatted symbol'] = df['Symbol'].str.replace(special_chars, "", regex=True)
+        
+        def add_only_new(data_frame: pd.DataFrame):
+            data_frame['formatted symbol'] = data_frame['Symbol'].str.replace(special_chars, "", regex=True)
+            data_frame = pd.merge(data_frame, df, how='outer', on='formatted symbol', suffixes=('', '_drop'), indicator=True)
+            data_frame = data_frame.loc[data_frame['_merge'] == 'left_only']
+            drop_cols = [c for c in data_frame.columns if '_drop' in c]
+            drop_cols.append('_merge')
+            data_frame.drop(columns=drop_cols, inplace=True)
+            return data_frame
+
+        df_is = add_only_new(df_is)
+        df = pd.concat([df, df_is], ignore_index=True, sort=False)
+        df_av = add_only_new(df_av)
+        df = pd.concat([df, df_av], ignore_index=True, sort=False)
+
         df.sort_values(by=['time_checked'], ascending=False, inplace=True)
         df.drop_duplicates(subset=['Company Name', 'Symbol'], inplace=True)
         df.loc[df['IPO Date'] >= pd.to_datetime('today'), 'Notes'] = 'Price expected ' + (
                 df['IPO Date'] - pd.offsets.DateOffset(days=1)).astype(str)
-        self.append_to_all(df)
-
-    def av(self):
-        file_name = 'AlphaVantage-US'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['ipoDate', 'time_checked'])
-        # df.drop(df.loc[(df['priceRangeLow'] == 0) & (df['priceRangeHigh'] == 0)].index, inplace=True)
-        df.loc[(df['priceRangeLow'] != df['priceRangeHigh']) & (df['priceRangeLow'] != 0), 'Price Range'] = df['priceRangeLow'].astype(str) + ' - ' + df['priceRangeHigh'].astype(str)
-        df.loc[(df['priceRangeLow'] == df['priceRangeHigh']) & (df['priceRangeLow'] != 0), 'Price'] = df['priceRangeHigh']
-        df.rename(columns={'name': 'Company Name', 'symbol': 'Symbol', 'ipoDate': 'IPO Date', 'exchange': 'Market', 'assetType': 'Notes'}, inplace=True)
         self.append_to_all(df)
 
     def jpx(self):
@@ -223,7 +251,7 @@ class DataTransformation:
         df = self.format_date_cols(df, ['Listing Date', 'time_checked'])
         df['Market'] = 'Hong Kong Stock Exchange'
         df['Symbol'] = df['Code▼'].str.extract(r'(\d*)\.HK')
-        # ToDo: AAStocks might show max offer price as the price?
+        # TODO: AAStocks might show max offer price as the price?
         df.loc[df['Offer Price'].str.contains('-', na=False), 'Price Range'] = df['Offer Price']
         df.loc[~df['Offer Price'].str.contains('-', na=False), 'Price'] = df['Offer Price']
         df.rename(columns={'Name': 'Company Name', 'Listing Date': 'IPO Date'}, inplace=True)

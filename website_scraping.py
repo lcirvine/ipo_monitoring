@@ -207,7 +207,7 @@ class WebDriver:
             df.loc[df['name'].str.contains(r' Warrant'), 'assetType'] = 'Warrants'
             df.loc[df['name'].str.contains(r' Right'), 'assetType'] = 'Rights'
             df.loc[df['name'].str.contains(r' Unit'), 'assetType'] = 'Units'
-            df.loc[df['assetType'].isna(), 'assetType'] = 'Shares'
+            df['assetType'].fillna('Shares', inplace=True)
             for c in ['priceRangeLow', 'priceRangeHigh']:
                 df[c] = pd.to_numeric(df[c], errors='coerce')
             df['time_checked'] = self.time_checked_str
@@ -234,6 +234,10 @@ class WebDriver:
                             Can be given either as a list of columns or a string with the column name.
         :return: DataFrame
         """
+        # TODO: move frankfurt to a special case like ASX
+        # when trying to concatenate the new df to the old df and match the data types I get the error
+        # 'Only a column name can be used for the key in a dtype mappings argument.'
+        # there must be a column in the old df that is not in the new df (or vice versa)
         df = pd.concat([old_df, new_df.astype(old_df.dtypes)], ignore_index=True, sort=False)
         if exclude_col and isinstance(exclude_col, str):
             ss = [col for col in df.columns.to_list() if col != exclude_col]

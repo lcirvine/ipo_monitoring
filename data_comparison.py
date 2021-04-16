@@ -73,17 +73,20 @@ class DataComparison:
         self.df_pp.sort_values('last_updated_date_utc', ascending=False, inplace=True)
         self.df_pp.drop_duplicates(subset=['iconum', 'master_deal'], inplace=True)
 
-    def compare(self):
+    def merge_entity_data(self):
         # merge data from sources with entities data
         df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'entityName', 'iconum']], how='left')
         # for Chinese Exchanges, get the English name from concordance API if possible
         cn_exch = ['Shenzhen Stock Exchange', 'Shanghai Stock Exchange', 'Shanghai', 'Shenzhen']
         df_m.loc[(df_m['Market'].isin(cn_exch)) & ~df_m['entityName'].isna(), 'Company Name'] = df_m['entityName']
-        # ToDo: for Chinese companies, get iconum from PEO-PIPE data if ticker matches
+        # TODO: If there is no iconum, try to match to PEO-PIPE data based on the Symbol
         # pp_cn = self.df_pp.loc[(self.df_pp['exchange'].isin(cn_exch)) & (~self.df_pp['ticker'].isna())]
         # pp_cn = pp_cn[['iconum', 'Company Name', 'ticker']]
         # self.concatenate_ticker_exchange()
-        df_m = pd.merge(df_m, self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
+        return df_m
+
+    def compare(self):
+        df_m = pd.merge(self.merge_entity_data(), self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
         for c in [col for col in df_m.columns if 'date' in col.lower()]:
             # intermittently getting InvalidIndexError: Reindexing only valid with uniquely valued Index objects
@@ -122,7 +125,6 @@ def main():
         return dc.compare()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
-        logger.info('-' * 100)
         error_email(str(e))
 
 

@@ -111,7 +111,7 @@ class EntityMatchBulk:
                      'factsetIndustryCode', 'factsetIndustryName', 'factsetSectorCode', 'factsetSectorName',
                      'parentName', 'parentMatchFlag', 'nameMatchString', 'nameMatchSource']
         df.drop(columns=drop_cols, inplace=True, errors='ignore')
-        df.sort_values(by=['matchFlag', 'similarityScore'], ascending=False, inplace=True)
+        df.sort_values(by=['confidenceScore', 'similarityScore'], ascending=False, inplace=True)
         df.drop_duplicates(subset=['clientName'], inplace=True)
         df.replace('', np.nan, inplace=True)
         df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
@@ -131,7 +131,7 @@ class EntityMatchBulk:
         df.loc[df['confidenceScore'] <= .60, 'mapStatus'] = 'UNMAPPED'
         df.loc[df['confidenceScore'] <= .60, ['entityName', 'iconum', 'entity_id', 'similarityScore', 'confidenceScore',
                                               'countryName', 'entityTypeCode', 'entityTypeDescription']] = np.nan
-        # ToDo: should entity mapping be csv so that I can just append to existing file?
+        # TODO: should entity mapping be csv so that I can just append to existing file?
         if os.path.exists(self.entity_mapping_file):
             df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)
         df.sort_values(by='Company Name', inplace=True)
