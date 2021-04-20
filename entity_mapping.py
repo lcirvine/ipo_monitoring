@@ -18,8 +18,6 @@ class EntityMatchBulk:
     def __init__(self):
         self.config = ConfigParser()
         self.config.read('api_key.ini')
-        self.df_s = pd.read_excel(os.path.join(os.getcwd(), 'Results', 'All IPOs.xlsx'),
-                                  usecols=['Company Name', 'Symbol', 'Market'])
         self.ref_folder = os.path.join(os.getcwd(), 'Reference')
         self.entity_mapping_file = os.path.join(self.ref_folder, 'Entity Mapping.xlsx')
         self.file_name = f'upcoming_IPO_entity_mapping_{datetime.utcnow().strftime("%Y-%m-%d %H%M")}'
@@ -30,7 +28,9 @@ class EntityMatchBulk:
     def create_csv(self, recheck_all: bool = False):
         # create a dataframe of all company names without iconums including new names found
         df_e = pd.read_excel(self.entity_mapping_file, usecols=['Company Name', 'iconum', 'entity_id', 'mapStatus'])
-        df = pd.merge(self.df_s, df_e, how='outer', on='Company Name')
+        df_s = pd.read_excel(os.path.join(os.getcwd(), 'Results', 'All IPOs.xlsx'),
+                             usecols=['Company Name', 'Symbol', 'Market'])
+        df = pd.merge(df_s, df_e, how='outer', on='Company Name')
         if recheck_all:
             # checking 1. company names that aren't null 2. don't have an iconum
             df = df.loc[~df['Company Name'].isna() & df['iconum'].isna()]
@@ -39,6 +39,9 @@ class EntityMatchBulk:
             df = df.loc[~df['Company Name'].isna() & df['iconum'].isna() & df['mapStatus'].isna()]
         df = df.drop_duplicates()
         logger.info(f"{len(df)} unmapped entities")
+        # making unique client_id by concatenating company name, symbol and market separated by underscores
+        df['client_id'] = df['Company Name'].fillna('') + '_' + df['Symbol'].fillna('').astype(str) + '_' + df['Market'].fillna('')
+        df.set_index('client_id', inplace=True)
         # save that dataframe to a csv encoded as utf8
         if len(df) > 1:
             df.to_csv(self.file, index_label='client_id', encoding='utf-8-sig')
@@ -51,7 +54,8 @@ class EntityMatchBulk:
                 'taskName': self.file_name,
                 'clientIdColumn': 'client_id',
                 'nameColumn': 'Company Name',
-                'includeEntityType': ['PUB', 'PVT', 'HOL', 'SUB']
+                'includeEntityType': ['PUB', 'PVT', 'HOL', 'SUB'],
+                'uniqueMatch': True
             }
             with open(self.file, 'rb') as f:
                 file_data = {'inputFile': (self.file_name + '.csv', f, 'text/csv')}
@@ -96,9 +100,11 @@ class EntityMatchBulk:
 
     def get_entity_decisions(self, eid):
         # get the entity mappings returned from the API
+        # seems that the default limit for number of results returned is 100 so increasing to 1000
         entity_decisions_endpoint = 'https://api.factset.com/content/factset-concordance/v1/entity-decisions'
         decisions_parameters = {
-            'taskId': str(eid)
+            'taskId': str(eid),
+            'limit': 1000
         }
         entity_decisions_response = requests.get(url=entity_decisions_endpoint, params=decisions_parameters,
                                                  auth=self.authorization, headers=self.headers, verify=False)
@@ -107,34 +113,32 @@ class EntityMatchBulk:
         
     def formatting_and_saving(self, df: pd.DataFrame):
         # save results from Concordance API
-        drop_cols = ['url', 'stateCode', 'stateName', 'sicCode', 'entitySubTypeCode', 'locationCity', 'regionName',
-                     'factsetIndustryCode', 'factsetIndustryName', 'factsetSectorCode', 'factsetSectorName',
-                     'parentName', 'parentMatchFlag', 'nameMatchString', 'nameMatchSource']
-        df.drop(columns=drop_cols, inplace=True, errors='ignore')
+        # braking out the client_id back into company name, Symbol and Market columns
+        df[['company_name', 'Symbol', 'Market']] = df['clientId'].str.split('_', expand=True)
         df.sort_values(by=['confidenceScore', 'similarityScore'], ascending=False, inplace=True)
-        df.drop_duplicates(subset=['clientName'], inplace=True)
         df.replace('', np.nan, inplace=True)
         df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
         cols = ['clientName', 'entityName', 'iconum', 'entityId', 'matchFlag', 'mapStatus', 'similarityScore',
-                'confidenceScore', 'countryCode', 'countryName', 'entityTypeCode', 'entityTypeDescription', 'taskId',
-                'rowIndex', 'clientId', 'clientCountry', 'clientState', 'clientUrl']
+                'confidenceScore', 'countryCode', 'countryName', 'entityTypeCode', 'entityTypeDescription',
+                'nameMatchString', 'nameMatchSource', 'taskId', 'rowIndex', 'clientId', 'company_name', 'Symbol',
+                'Market', 'clientCountry', 'clientState', 'clientUrl']
         df = df[cols]
         df.to_csv(os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '_results.csv'),
                   index=False, encoding='utf-8-sig')
+        df.drop_duplicates(subset=['clientName'], inplace=True)
         # add results to entity mapping file
         df.rename(columns={'clientName': 'Company Name', 'entityId': 'entity_id'}, inplace=True)
-        df = pd.merge(df, self.df_s, how='left', on='Company Name')
         final_cols = ['Company Name', 'Symbol', 'Market', 'entityName', 'iconum', 'entity_id', 'mapStatus',
                       'similarityScore', 'confidenceScore', 'countryName', 'entityTypeDescription']
         df = df[final_cols]
-        # rows with confidence below .60 should be not be considered matches
-        df.loc[df['confidenceScore'] <= .60, 'mapStatus'] = 'UNMAPPED'
-        df.loc[df['confidenceScore'] <= .60, ['entityName', 'iconum', 'entity_id', 'similarityScore', 'confidenceScore',
+        # rows with confidence below .75 should be not be considered matches
+        df.loc[df['confidenceScore'] <= .75, 'mapStatus'] = 'UNMAPPED'
+        df.loc[df['confidenceScore'] <= .75, ['entityName', 'iconum', 'entity_id', 'similarityScore', 'confidenceScore',
                                               'countryName', 'entityTypeCode', 'entityTypeDescription']] = np.nan
-        # TODO: should entity mapping be csv so that I can just append to existing file?
         if os.path.exists(self.entity_mapping_file):
             df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)
-        df.sort_values(by='Company Name', inplace=True)
+        df.sort_values(by=['entityName', 'Company Name'], inplace=True)
+        df.drop_duplicates(subset=['Company Name'], inplace=True)
         df.to_excel(self.entity_mapping_file, index=False, encoding='utf-8-sig')
 
     @staticmethod
@@ -165,7 +169,7 @@ def main():
     logger.info("Checking Cordance API for entity IDs")
     em = EntityMatchBulk()
     try:
-        em.create_csv()
+        em.create_csv(recheck_all=True)
         em.entity_mapping_api()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
