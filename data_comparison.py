@@ -82,7 +82,6 @@ class DataComparison:
         # TODO: If there is no iconum, try to match to PEO-PIPE data based on the Symbol
         # pp_cn = self.df_pp.loc[(self.df_pp['exchange'].isin(cn_exch)) & (~self.df_pp['ticker'].isna())]
         # pp_cn = pp_cn[['iconum', 'Company Name', 'ticker']]
-        # self.concatenate_ticker_exchange()
         return df_m
 
     def compare(self):
