@@ -2,6 +2,7 @@ import os
 import logging
 from datetime import date
 import configparser
+import pandas as pd
 import win32com.client as win32
 
 
@@ -40,6 +41,28 @@ def error_email(error_message: str = ''):
     mail.Send()
 
 
-def consolidate_webscraping_results():
-    # TODO: review webscraping results to see how the webscraper is performing
-    pass
+def consolidate_webscraping_results(num_recent: int = 10):
+    df = pd.read_csv(os.path.join(log_folder, 'Webscraping Results.csv'))
+    df.sort_values(by=['time_checked'], ascending=False, inplace=True)
+
+    failures = df.loc[df['result'] == 0].drop_duplicates(subset='source', ignore_index=True)
+    failures.rename(columns={'time_checked': 'most_recent_failure'}, inplace=True)
+    failures.drop(columns='result', inplace=True)
+
+    successes = df.loc[df['result'] == 1].drop_duplicates(subset='source', ignore_index=True)
+    successes.rename(columns={'time_checked': 'most_recent_success'}, inplace=True)
+    successes.drop(columns='result', inplace=True)
+
+    recent_checks = df['time_checked'].unique().tolist()[:num_recent]
+    df_recent = df.loc[df['time_checked'].isin(recent_checks)]
+    df_recent = df_recent.groupby('source')['result'].sum().reset_index()
+    df_recent.sort_values(by=['result'], inplace=True)
+    df_recent['Recent Success Rate'] = (df_recent['result'] / num_recent) * 100
+
+    df_recent = df_recent.merge(failures, how='left', on='source')
+    df_recent = df_recent.merge(successes, how='left', on='source')
+    df_recent.to_csv(os.path.join(log_folder, 'Recent Webscraping Performance.csv'), index=False, encoding='utf-8-sig')
+
+
+if __name__ == '__main__':
+    consolidate_webscraping_results()
