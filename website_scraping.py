@@ -234,10 +234,9 @@ class WebDriver:
                             Can be given either as a list of columns or a string with the column name.
         :return: DataFrame
         """
-        # TODO: move frankfurt to a special case like ASX
-        # when trying to concatenate the new df to the old df and match the data types I get the error
+        # make sure the same columns exist in old_df and new_df
+        # otherwise it will cause an error when setting data type of new_df the same as old_df
         # 'Only a column name can be used for the key in a dtype mappings argument.'
-        # there must be a column in the old df that is not in the new df (or vice versa)
         df = pd.concat([old_df, new_df.astype(old_df.dtypes)], ignore_index=True, sort=False)
         if exclude_col and isinstance(exclude_col, str):
             ss = [col for col in df.columns.to_list() if col != exclude_col]

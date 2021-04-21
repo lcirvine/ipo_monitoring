@@ -327,7 +327,7 @@ class DataTransformation:
         df = self.format_date_cols(df, ['Date', 'time_checked'])
         rows_to_shift = df.loc[(df['First Price and Market Cap'].isna()) &
                                (~df['Sub Price and Deal Size'].isna())].index.to_list()
-        df.iloc[rows_to_shift, 4:-1] = df.iloc[rows_to_shift, 4:-1].shift(1, axis=1)
+        df.iloc[rows_to_shift, 4:] = df.iloc[rows_to_shift, 4:].shift(1, axis=1)
         df['Company Name'] = df['Summary'].str.extract(r'\)([a-zA-Z\s\d\-&\.,]*)Sector')
         df['Offer Type'] = df['Market'].str.extract(r'\(([a-zA-Z\s\/]*)\)')
         df = df.loc[df['Offer Type'] != 'Transfer']

@@ -169,7 +169,7 @@ def main():
     logger.info("Checking Cordance API for entity IDs")
     em = EntityMatchBulk()
     try:
-        em.create_csv(recheck_all=True)
+        em.create_csv()
         em.entity_mapping_api()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
