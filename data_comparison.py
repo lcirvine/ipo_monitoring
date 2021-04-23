@@ -76,12 +76,18 @@ class DataComparison:
     def merge_entity_data(self):
         # merge data from sources with entities data
         df_m = pd.merge(self.df_s, self.df_e[['Company Name', 'entityName', 'iconum']], how='left')
-        # for Chinese Exchanges, get the English name from concordance API if possible
+        # Chinese exchanges will have company name in Chinese
+        # the Concordance API will rarely return an iconum for a Chinese name
+        # If there is no iconum for a company on a Chinese exchange, try to compare PEO-PIPE data based on the Symbol
         cn_exch = ['Shenzhen Stock Exchange', 'Shanghai Stock Exchange', 'Shanghai', 'Shenzhen']
+        pp_cn = self.df_pp.loc[(self.df_pp['exchange'].isin(cn_exch)) & (~self.df_pp['ticker'].isna())]
+        pp_cn = pp_cn[['iconum', 'Company Name', 'ticker']]
+        df_m = pd.merge(df_m, pp_cn, how='left', left_on='Symbol', right_on='ticker', suffixes=('', '_cn'))
+        df_m['iconum'].fillna(df_m['iconum_cn'], inplace=True)
+        df_m['entityName'].fillna(df_m['Company Name_cn'], inplace=True)
+        # for Chinese Exchanges, get the English name from concordance API or PEO-PIPE data if possible
         df_m.loc[(df_m['Market'].isin(cn_exch)) & ~df_m['entityName'].isna(), 'Company Name'] = df_m['entityName']
-        # TODO: If there is no iconum, try to match to PEO-PIPE data based on the Symbol
-        # pp_cn = self.df_pp.loc[(self.df_pp['exchange'].isin(cn_exch)) & (~self.df_pp['ticker'].isna())]
-        # pp_cn = pp_cn[['iconum', 'Company Name', 'ticker']]
+        df_m.drop(columns=['iconum_cn', 'Company Name_cn', 'ticker'], inplace=True)
         return df_m
 
     def compare(self):
