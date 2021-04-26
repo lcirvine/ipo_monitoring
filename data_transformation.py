@@ -266,44 +266,45 @@ class DataTransformation:
         df.rename(columns={'Name': 'Company Name', 'Expected first date of trading': 'IPO Date', 'Price range': 'Price Range'}, inplace=True)
         self.append_to_all(df)
 
-    def bstsx(self):
-        file_name = 'BS-TSX'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Date', 'time_checked'])
-        df.loc[df['Company Name'].str.contains(' ETF', na=False), 'Asset Type'] = 'ETF'
-        df.loc[df['Company Name'].str.contains(' Fixed Income', na=False), 'Asset Type'] = 'Fixed Income'
-        df.loc[df['Company Name'].str.contains(' Private Pool', na=False), 'Asset Type'] = 'Private Pool'
-        df = df.loc[df['Asset Type'].isna()]
-        df['Market'] = 'TSX'
-        df.rename(columns={'Date': 'IPO Date', 'Ticker': 'Symbol'}, inplace=True)
-        self.append_to_all(df)
+    def ca(self):
 
-    def bstsxv(self):
-        file_name = 'BS-TSXV'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Date', 'time_checked'])
-        df.loc[df['Company Name'].str.contains(' ETF', na=False), 'Asset Type'] = 'ETF'
-        df.loc[df['Company Name'].str.contains(' Fixed Income', na=False), 'Asset Type'] = 'Fixed Income'
-        df.loc[df['Company Name'].str.contains(' Private Pool', na=False), 'Asset Type'] = 'Private Pool'
-        df = df.loc[df['Asset Type'].isna()]
-        df['Market'] = 'TSX Venture'
-        df.rename(columns={'Date': 'IPO Date', 'Ticker': 'Symbol'}, inplace=True)
-        self.append_to_all(df)
+        def bs():
+            file_name = 'BS-TSX'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            bstsx = self.src_dfs.get(file_name).copy()
+            bstsx['Market'] = 'TSX'
 
-    def tsx(self):
-        file_name = 'TSX'
-        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
-        df = self.src_dfs.get(file_name).copy()
-        df = self.format_date_cols(df, ['Date', 'time_checked'])
-        df['Symbol'] = df['Company'].str.extract(r'\(([a-zA-Z\.,\s]*)\)')
-        df['Company Name'] = df['Company'].str.extract(r'^([a-zA-Z\.\s\d&,\-]*)[\xa0|\(]')
-        df['Company Name'] = df['Company Name'].str.strip()
-        df['Market'] = 'TSX'
-        df.loc[df['Company Name'].str.contains(' ETF', na=False), 'Asset Type'] = 'ETF'
-        df = df.loc[df['Asset Type'].isna()]
-        df.rename(columns={'Date': 'IPO Date'}, inplace=True)
+            file_name = 'BS-TSXV'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            bstsxv = self.src_dfs.get(file_name).copy()
+            bstsxv['Market'] = 'TSX Venture'
+
+            df_bs = pd.concat([bstsx, bstsxv], ignore_index=True)
+            df_bs = self.format_date_cols(df_bs, ['Date', 'time_checked'])
+            df_bs.loc[df_bs['Company Name'].str.contains(' ETF', na=False), 'Asset Type'] = 'ETF'
+            df_bs.loc[df_bs['Company Name'].str.contains(' Fixed Income', na=False), 'Asset Type'] = 'Fixed Income'
+            df_bs.loc[df_bs['Company Name'].str.contains(' Private Pool', na=False), 'Asset Type'] = 'Private Pool'
+            df_bs = df_bs.loc[df_bs['Asset Type'].isna()]
+            df_bs.rename(columns={'Date': 'IPO Date', 'Ticker': 'Symbol'}, inplace=True)
+            return df_bs
+
+        def tsx():
+            file_name = 'TSX'
+            assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+            df_tsx = self.src_dfs.get(file_name).copy()
+            df_tsx = self.format_date_cols(df_tsx, ['Date', 'time_checked'])
+            df_tsx['Symbol'] = df_tsx['Company'].str.extract(r'\(([a-zA-Z\.,\s]*)\)')
+            df_tsx['Company Name'] = df_tsx['Company'].str.extract(r'^([a-zA-Z\.\s\d&,\-]*)[\xa0|\(\+]')
+            df_tsx['Company Name'] = df_tsx['Company Name'].str.strip()
+            df_tsx['Market'] = 'TSX'
+            df_tsx.loc[df_tsx['Company Name'].str.contains(' ETF', na=False), 'Asset Type'] = 'ETF'
+            df_tsx = df_tsx.loc[df_tsx['Asset Type'].isna()]
+            df_tsx.rename(columns={'Date': 'IPO Date'}, inplace=True)
+            return df_tsx
+
+        df_b = bs()
+        df_t = tsx()
+        df = pd.concat([df_b, df_t], join='outer', ignore_index=True).drop_duplicates(subset=['Company Name'])
         self.append_to_all(df)
 
     def nse(self):
@@ -473,9 +474,7 @@ def main():
         dt.euronext()
         dt.aastocks()
         dt.lse()
-        dt.bstsx()
-        dt.bstsxv()
-        dt.tsx()
+        dt.ca()
         dt.frankfurt()
         dt.krx()
         dt.asx()
