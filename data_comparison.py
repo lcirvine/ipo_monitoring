@@ -97,6 +97,24 @@ class DataComparison:
         df_m.drop(columns=['iconum_cn', 'Company Name_cn', 'ticker'], inplace=True)
         return df_m
 
+    def file_for_rpds(self):
+        """
+        Creating a file that will be used to create RPDs for Symbology and Fundamentals teams.
+        This will have all IPOs both from external sources and collected internally.
+        :return:
+        """
+        pp_cols = ['iconum', 'CUSIP', 'Company Name', 'client_deal_id', 'ticker', 'exchange', 'Price', 'trading_date',
+                   'last_updated_date_utc']
+        df_outer = pd.merge(self.merge_entity_data(), self.df_pp[pp_cols], how='outer', on='iconum',
+                            suffixes=('_external', '_fds'))
+        df_outer['IPO Date'] = pd.to_datetime(df_outer['IPO Date'].fillna(pd.NaT), errors='coerce')
+        df_outer['trading_date'] = pd.to_datetime(df_outer['trading_date'].fillna(pd.NaT), errors='coerce')
+        df_outer = df_outer.loc[
+            (df_outer['IPO Date'].dt.date >= date.today())
+            | (df_outer['trading_date'].dt.date >= date.today())
+        ]
+        df_outer.to_excel(os.path.join(self.ref_folder, 'IPO Monitoring Data.xlsx'), index=False, encoding='utf-8-sig')
+
     def compare(self):
         df_m = pd.merge(self.merge_entity_data(), self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
@@ -134,6 +152,7 @@ def main():
     dc = DataComparison()
     try:
         dc.concatenate_ticker_exchange()
+        dc.file_for_rpds()
         return dc.compare()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
