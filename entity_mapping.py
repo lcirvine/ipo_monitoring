@@ -19,6 +19,8 @@ class EntityMatchBulk:
         self.config = ConfigParser()
         self.config.read('api_key.ini')
         self.ref_folder = os.path.join(os.getcwd(), 'Reference')
+        if not os.path.exists(self.ref_folder):
+            os.mkdir(self.ref_folder)
         self.entity_mapping_file = os.path.join(self.ref_folder, 'Entity Mapping.xlsx')
         self.file_name = f'upcoming_IPO_entity_mapping_{datetime.utcnow().strftime("%Y-%m-%d %H%M")}'
         self.file = os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '.csv')
