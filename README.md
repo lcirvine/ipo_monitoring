@@ -30,7 +30,7 @@ In order to compare the data, I need to find the FactSet entity identifiers for 
 Now that I have entity identifiers, I want to compare the data to what has been collected by our PEO-PIPE team. I run a query to the PEO-PIPE staging database to retrieve IPOs that were updated in the last 7 days. I add the results to a PEO-PIPE data file in the reference folder. I try to run a small query with updates and add it to existing data.
 
 ### [RPD Creation](https://github.factset.com/lirvine/ipo_monitoring/blob/master/rpd_creation.py) ###
-Creates an IPO Monitoring RPD for each upcoming IPO. If an RPD already exists and the IPO was updated (i.e. the IPO date is changed), the original RPD is updated.
+Creates an IPO Monitoring RPD for each upcoming IPO using the [RPD API](http://is.factset.com/rpd/api/v2/help/). If an RPD already exists and the IPO was updated (i.e. the IPO date has changed), the original RPD is updated.
 
 ### [Email Report](https://github.factset.com/lirvine/ipo_monitoring/blob/master/email_report.py) ###
 Emails out the report to the PEO-PIPE team. 
