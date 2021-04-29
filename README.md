@@ -35,7 +35,7 @@ Creates an IPO Monitoring RPD for each upcoming IPO using the [RPD API](http://i
 ### [Email Report](https://github.factset.com/lirvine/ipo_monitoring/blob/master/email_report.py) ###
 Emails out the report to the PEO-PIPE team. 
 
-Note: this is not called by ipo_monitoring, there is a separate batch file that runs the script to email the report. The reason is because the report is emailed out to the PEO-PIPE team less frequently than the webscraping/RPD creation. 
+Note: this is not called by ipo_monitoring, there is a separate batch file that runs the script to email the report. The reason is because the report is emailed out to the PEO-PIPE team less frequently than the webscraping/RPD creation. Please see the [current schedule](https://github.factset.com/lirvine/ipo_monitoring/blob/master/schedule.csv). 
 
 ### [File Management](https://github.factset.com/lirvine/ipo_monitoring/blob/master/file_management.py) ###
 This just does some housekeeping. It deletes old files that are no longer needed.
