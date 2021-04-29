@@ -33,7 +33,7 @@ class DataComparison:
         df.drop_duplicates(inplace=True)
         pp_file = os.path.join(self.ref_folder, 'PEO-PIPE IPO Data.xlsx')
         if os.path.exists(pp_file):
-            df = pd.concat([pd.read_excel(pp_file), df], ignore_index=True, sort=False)
+            df = pd.concat([pd.read_excel(pp_file, dtype={'CUSIP': str}), df], ignore_index=True, sort=False)
         df['exchange'] = df['exchange'].str.strip()
         df.sort_values(by='last_updated_date_utc', ascending=False, inplace=True)
         # numeric tickers could appear as duplicates if the same ticker has been interpreted as numeric and string
@@ -65,9 +65,16 @@ class DataComparison:
         df_exch.set_index('iconum', inplace=True)
         df_te = pd.concat([df_tickers, df_exch], axis=1).reset_index()
         self.df_pp = self.df_pp.merge(df_te, how='left', on='iconum', suffixes=('_drop', ''))
-        self.df_pp.drop(columns=['ticker_drop', 'exchange_drop'], inplace=True)
-        self.df_pp = self.df_pp[['iconum', 'Company Name', 'master_deal', 'client_deal_id', 'ticker', 'exchange',
-                                 'Price', 'min_offering_price', 'max_offering_price', 'announcement_date',
+
+        df_cusip = self.df_pp[['iconum', 'CUSIP']].dropna(subset=['CUSIP'])
+        df_cusip.drop_duplicates(inplace=True)
+        df_cusip['CUSIP'] = df_cusip['CUSIP'].astype(str)
+        df_cusip = df_cusip.groupby('iconum')['CUSIP'].apply(', '.join).reset_index()
+        self.df_pp = self.df_pp.merge(df_cusip, how='left', on='iconum', suffixes=('_drop', ''))
+
+        self.df_pp.drop(columns=['ticker_drop', 'exchange_drop', 'CUSIP_drop'], inplace=True)
+        self.df_pp = self.df_pp[['iconum', 'CUSIP', 'Company Name', 'master_deal', 'CUSIP', 'client_deal_id', 'ticker',
+                                 'exchange', 'Price', 'min_offering_price', 'max_offering_price', 'announcement_date',
                                  'pricing_date', 'trading_date', 'closing_date', 'deal_status',
                                  'last_updated_date_utc']]
         self.df_pp.sort_values('last_updated_date_utc', ascending=False, inplace=True)
@@ -90,6 +97,24 @@ class DataComparison:
         df_m.drop(columns=['iconum_cn', 'Company Name_cn', 'ticker'], inplace=True)
         return df_m
 
+    def file_for_rpds(self):
+        """
+        Creating a file that will be used to create RPDs for Symbology and Fundamentals teams.
+        This will have all IPOs both from external sources and collected internally.
+        :return:
+        """
+        pp_cols = ['iconum', 'CUSIP', 'Company Name', 'client_deal_id', 'ticker', 'exchange', 'Price', 'trading_date',
+                   'last_updated_date_utc']
+        df_outer = pd.merge(self.merge_entity_data(), self.df_pp[pp_cols], how='outer', on='iconum',
+                            suffixes=('_external', '_fds'))
+        df_outer['IPO Date'] = pd.to_datetime(df_outer['IPO Date'].fillna(pd.NaT), errors='coerce')
+        df_outer['trading_date'] = pd.to_datetime(df_outer['trading_date'].fillna(pd.NaT), errors='coerce')
+        df_outer = df_outer.loc[
+            (df_outer['IPO Date'].dt.date >= date.today())
+            | (df_outer['trading_date'].dt.date >= date.today())
+        ]
+        df_outer.to_excel(os.path.join(self.ref_folder, 'IPO Monitoring Data.xlsx'), index=False, encoding='utf-8-sig')
+
     def compare(self):
         df_m = pd.merge(self.merge_entity_data(), self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
@@ -104,7 +129,7 @@ class DataComparison:
         df_m.loc[df_m['Price_external'].isna(), 'IPO Prices Match'] = True
         df_m = df_m[['IPO Dates Match', 'IPO Prices Match', 'iconum', 'Company Name_external', 'Symbol', 'Market',
                      'IPO Date', 'Price_external', 'Price Range', 'Status', 'Notes', 'time_checked', 'Company Name_fds',
-                     'master_deal', 'client_deal_id', 'ticker', 'exchange', 'Price_fds', 'min_offering_price',
+                     'master_deal', 'client_deal_id', 'CUSIP', 'ticker', 'exchange', 'Price_fds', 'min_offering_price',
                      'max_offering_price', 'announcement_date', 'pricing_date', 'trading_date', 'closing_date',
                      'deal_status', 'last_updated_date_utc']]
         df_m.drop_duplicates(inplace=True)
@@ -127,6 +152,7 @@ def main():
     dc = DataComparison()
     try:
         dc.concatenate_ticker_exchange()
+        dc.file_for_rpds()
         return dc.compare()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
