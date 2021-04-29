@@ -6,7 +6,9 @@ This project was created to monitor IPOs from various sources, compare the data 
 ## What it Does ##
 
 ### [IPO Monitoring](https://github.factset.com/lirvine/ipo_monitoring/blob/master/ipo_monitoring.py) ###
-There are several stages to IPO monitoring, this calls each script. Each piece has try and except blocks so that if one part fails, the other the parts can continue. 
+There are several stages to IPO monitoring, a batch file runs ipo_monitoring which calls each script. Each piece has try and except blocks so that if one part fails, the other the parts can continue. 
+
+Note: email_report is run by a separate batch file. 
 
 ### [Source Reference](https://github.factset.com/lirvine/ipo_monitoring/blob/master/source_reference.py) ###
 I gather data from multiple websites and each one is different. I create a JSON file with the details of each website (the url, table elements, etc.) so that I know what to look for on each website.
@@ -27,8 +29,13 @@ In order to compare the data, I need to find the FactSet entity identifiers for 
 ### [Data Comparison](https://github.factset.com/lirvine/ipo_monitoring/blob/master/data_comparison.py) ###
 Now that I have entity identifiers, I want to compare the data to what has been collected by our PEO-PIPE team. I run a query to the PEO-PIPE staging database to retrieve IPOs that were updated in the last 7 days. I add the results to a PEO-PIPE data file in the reference folder. I try to run a small query with updates and add it to existing data.
 
+### [RPD Creation](https://github.factset.com/lirvine/ipo_monitoring/blob/master/rpd_creation.py) ###
+Creates an IPO Monitoring RPD for each upcoming IPO. If an RPD already exists and the IPO was updated (i.e. the IPO date is changed), the original RPD is updated.
+
 ### [Email Report](https://github.factset.com/lirvine/ipo_monitoring/blob/master/email_report.py) ###
-Emails out the report to the PEO-PIPE team.
+Emails out the report to the PEO-PIPE team. 
+
+Note: this is not called by ipo_monitoring, there is a separate batch file that runs the script to email the report. The reason is because the report is emailed out to the PEO-PIPE team less frequently than the webscraping/RPD creation. 
 
 ### [File Management](https://github.factset.com/lirvine/ipo_monitoring/blob/master/file_management.py) ###
 This just does some housekeeping. It deletes old files that are no longer needed.
