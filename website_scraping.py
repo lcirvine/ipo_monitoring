@@ -120,7 +120,7 @@ class WebDriver:
             df['Company Name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
             df['IPO Date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
             df['IPO Date'] = pd.to_datetime(df['IPO Date'], errors='coerce').dt.date
-            df['Market'] = 'Australia Stock Exchange'
+            df['Market'] = 'Australian Stock Exchange'
             df['time_checked'] = self.time_checked_str
             if df is not None:
                 s_file = os.path.join(self.source_data_folder, 'ASX.csv')
