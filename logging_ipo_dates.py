@@ -41,7 +41,7 @@ def error_email(error_message: str = ''):
     mail.Send()
 
 
-def consolidate_webscraping_results(num_recent: int = 10):
+def consolidate_webscraping_results(num_recent: int = 30):
     df = pd.read_csv(os.path.join(log_folder, 'Webscraping Results.csv'))
     df.sort_values(by=['time_checked'], ascending=False, inplace=True)
 
