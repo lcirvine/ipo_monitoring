@@ -87,7 +87,7 @@ class RPDCreation:
         df_rpd = df_rpd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 
                          'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'RPD Number', 'RPD Link',
                          'RPD Creation Date']]
-        logger.info(f"{len(df_rpd)} updates to make on existing RPDs")
+        logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join(df_rpd['RPD Number'].to_list())}")
         df_rpd.replace(np.nan, '', inplace=True)
         # adding separator to columns to make it more readable in the RPD
         df_rpd.columns = [col + separator for col in df_rpd.columns]
@@ -123,10 +123,9 @@ class RPDCreation:
                 ]
             res_q = self.session.post(question_endpoint, data=json.dumps(questions), headers=self.headers)
 
-    def create_new_rpds(self, sample_size: int = 1, separator: str = ':  ') -> dict:
+    def create_new_rpds(self, separator: str = ':  ') -> dict:
         """
         Creates new RPDs for all the IPOs that currently do not have an RPD.
-        :param sample_size: Used for testing. Currently creating only a small sample of RPDs.
         :param separator: A separator is added to the columns to make the RPD comment more readable.
         :return: Dictionary with data about the new RPDs created
         """
@@ -139,7 +138,7 @@ class RPDCreation:
                          'Status', 'Notes', 'Last Checked', 'IPO Deal ID']]
         df_rpd.replace(np.nan, '', inplace=True)
         df_rpd.columns = [col + separator for col in df_rpd.columns]
-        for idx, row in df_rpd.head(sample_size).iterrows():
+        for idx, row in df_rpd.iterrows():
             ipo_string = df_rpd.loc[idx].to_string(na_rep='').replace('\n', '<br>')
             company_name = str(row['Company Name' + separator])
             exchange = str(row['Market' + separator])
@@ -182,7 +181,7 @@ class RPDCreation:
                 rpd_dict['RPD Link'].append('https://is.factset.com/rpd/summary.aspx?messageId=' + str(rpd_num))
                 rpd_dict['RPD Creation Date'].append(rpd_date)
             sleep(1)
-        logger.info(f"Created {len(rpd_dict)} new RPDs")
+        logger.info(f"Created {len(rpd_dict)} new RPDs: {', '.join([str(num) for num in rpd_dict['RPD Number']])}")
         return rpd_dict
 
     def add_new_rpds(self):
@@ -191,15 +190,18 @@ class RPDCreation:
         the main data frame.
         :return:
         """
-        df_rpd = pd.DataFrame(self.create_new_rpds())
-        df_rpd['RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + df_rpd['RPD Number'].astype(str)
-        self.df = pd.merge(self.df, df_rpd, how='left', on='Company Name', suffixes=('', '_new'))
-        fillna_dict = {
-            'RPD Number': 'RPD Number_new',
-            'RPD Link': 'RPD Link_new',
-            'RPD Creation Date': 'RPD Creation Date_new'}
-        for col, fill_val in fillna_dict.items():
-            self.df[col].fillna(self.df[fill_val], inplace=True)
+        rpd_dict = self.create_new_rpds()
+        if rpd_dict is not None and len(rpd_dict) > 0:
+            df_rpd = pd.DataFrame(rpd_dict)
+            df_rpd['RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + df_rpd['RPD Number'].astype(str)
+            df_rpd['RPD Creation Date'] = pd.to_datetime(df_rpd['RPD Creation Date'].fillna(pd.NaT), errors='coerce').dt.tz_localize(None)
+            self.df = pd.merge(self.df, df_rpd, how='left', on='Company Name', suffixes=('', '_new'))
+            fillna_dict = {
+                'RPD Number': 'RPD Number_new',
+                'RPD Link': 'RPD Link_new',
+                'RPD Creation Date': 'RPD Creation Date_new'}
+            for col, fill_val in fillna_dict.items():
+                self.df[col].fillna(self.df[fill_val], inplace=True)
         
     def save_results(self):
         """
