@@ -437,6 +437,18 @@ class DataTransformation:
                   inplace=True)
         self.append_to_all(df)
 
+    def italy(self):
+        file_name = 'BIT'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df = self.src_dfs.get(file_name).copy()
+        df = self.format_date_cols(df, ['Start of Trading'], dayfirst=True)
+        df = self.format_date_cols(df, ['time_checked'])
+        df['Market'] = df['Market'].str.replace('*', 'Professional Segment', regex=False)
+        df['Market'] = 'Borsa Italiana - ' + df['Market']
+        df.rename(columns={'Start of Trading': 'IPO Date', 'Transaction Type': 'Notes'},
+                  inplace=True)
+        self.append_to_all(df)
+
     def formatting_all(self):
         # removing commas from company name - Concordance API will interpret those as new columns
         self.df_all['Company Name'] = self.df_all['Company Name'].str.replace(',', '', regex=False)
@@ -485,6 +497,7 @@ def main():
         dt.bm()
         dt.nasdaqnordic()
         dt.spotlight()
+        dt.italy()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))
