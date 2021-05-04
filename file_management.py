@@ -59,7 +59,13 @@ def archive_logs(num_days: int = 30):
         if first_log_date_datetime < old_date:
             log_file_name, log_file_ext = os.path.splitext(log_file)
             archived_log = f"{log_file_name} {key_dates.get('first_log_date')} - {key_dates.get('last_log_date', datetime.today().strftime('%Y-%m-%d'))}{log_file_ext}"
-            shutil.move(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
+            # TODO: this will fail with PermissionError
+            #  The process cannot access the file because it is being used by another process
+            # os.rename(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
+            try:
+                shutil.move(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
+            except PermissionError as e:
+                logger.error(e)
 
 
 def return_date_str(text: str, date_pat: str = r"(\d{4}\-\d{2}\-\d{2})"):
