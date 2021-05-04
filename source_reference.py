@@ -612,6 +612,29 @@ sources_dict = {
         ],
         'file': 'BM'
     },
+    'BIT': {
+        'exchange': 'Borsa Italiana',
+        'rank': None,
+        'url': 'https://www.borsaitaliana.it/azioni/ipoematricole/ipo-home.en.htm',
+        'table_num': 0,
+        'table_elem': 'table',
+        'table_attrs': {'class': ['m-table', '-editorial']},
+        'row_elem': 'tr',
+        # 'row_attrs': {},
+        'cell_elem': 'td',
+        # 'cell_attrs': {},
+        'header_elem': 'th',
+        # 'header_attrs': {},
+        # 'link_elem': '',
+        # 'link_key': '',
+        'columns': [
+            'Company Name',
+            'Transaction Type',
+            'Start of Trading',
+            'Market'
+        ],
+        'file': 'BIT'
+    },
     'IPOScoop': {
         'exchange': 'NYSE and Nasdaq',
         # 'rank': None
