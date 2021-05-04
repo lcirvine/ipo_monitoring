@@ -57,7 +57,7 @@ def consolidate_webscraping_results(num_recent: int = 30):
     df_recent = df.loc[df['time_checked'].isin(recent_checks)]
     df_recent = df_recent.groupby('source')['result'].sum().reset_index()
     df_recent.sort_values(by=['result'], inplace=True)
-    df_recent['Recent Success Rate'] = (df_recent['result'] / num_recent) * 100
+    df_recent['Recent Success Rate'] = round((df_recent['result'] / num_recent) * 100, 2)
 
     df_recent = df_recent.merge(failures, how='left', on='source')
     df_recent = df_recent.merge(successes, how='left', on='source')
