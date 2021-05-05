@@ -109,11 +109,13 @@ class DataComparison:
                             suffixes=('_external', '_fds'))
         df_outer['IPO Date'] = pd.to_datetime(df_outer['IPO Date'].fillna(pd.NaT), errors='coerce')
         df_outer['trading_date'] = pd.to_datetime(df_outer['trading_date'].fillna(pd.NaT), errors='coerce')
-        df_outer = df_outer.loc[
+        df_ipo = df_outer.loc[
             (df_outer['IPO Date'].dt.date >= date.today())
             | (df_outer['trading_date'].dt.date >= date.today())
         ]
-        df_outer.to_excel(os.path.join(self.ref_folder, 'IPO Monitoring Data.xlsx'), index=False, encoding='utf-8-sig')
+        df_ipo.to_excel(os.path.join(self.ref_folder, 'IPO Monitoring Data.xlsx'), index=False, encoding='utf-8-sig')
+        df_wd = df_outer.loc[df_outer['Status'] == 'Withdrawn']
+        df_wd.to_excel(os.path.join(self.ref_folder, 'Withdrawn IPOs.xlsx'), index=False, encoding='utf-8-sig')
 
     def compare(self):
         df_m = pd.merge(self.merge_entity_data(), self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
