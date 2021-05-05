@@ -17,21 +17,28 @@ class RPDCreation:
     def __init__(self):
         self.config = configparser.ConfigParser()
         self.config.read('api_key.ini')
+        self.source_file = os.path.join('Reference', 'IPO Monitoring Data.xlsx')
         self.result_file = os.path.join(os.getcwd(), 'Reference', 'IPO Monitoring RPDs.xlsx')
-        self.df = self.create_data_frame()
+        self.wd_file = os.path.join(os.getcwd(), 'Reference', 'Withdrawn IPOs.xlsx')
+        self.df_ipo = self.return_formatted_df_from_file(self.source_file)
+        self.df_wd = self.return_formatted_df_from_file(self.wd_file)
+        self.df_rpd = self.rpd_data_frame()
+        self.df = self.create_main_data_frame()
         self.session = self.create_session()
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         self.base_url = 'http://is.factset.com/rpd/api/v2/'
-        self.endpoint = self.base_url + 'rpd'
 
-    def create_data_frame(self) -> pd.DataFrame:
+    @staticmethod
+    def return_formatted_df_from_file(file: str):
         """
-        Creates the main data frame that will be used to create and update RPDs.
-        Currently only creating/updating RPDs for IPOs where the IPO Date is >= today.
-        :return: Data frame with all the information that will go into the RPD. Existing information that was previously
-        sent in the RPD will have _old appended to the column name.
+        Takes a file as input, creates a data frame from that file, does some clean-up and formatting.
+        Used to create a data frame from IPO and withdrawn IPO files created in data_comparison.
+        Data from sources takes precedence over internal data since it should be more up-to-date.
+
+        :param file: os path of the file that will be turned into a dataframe
+        :return:
         """
-        df = pd.read_excel(os.path.join('Reference', 'IPO Monitoring Data.xlsx'),
+        df = pd.read_excel(file,
                            dtype={'iconum': str, 'Symbol': str, 'ticker': str},
                            converters={'IPO Date': pd.to_datetime,
                                        'time_checked': pd.to_datetime,
@@ -45,13 +52,36 @@ class RPDCreation:
             df[col].fillna(df[fill_val], inplace=True)
         df = df[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
                  'Status', 'Notes', 'Last Checked', 'IPO Deal ID']]
-        if os.path.exists(self.result_file):
-            df = pd.merge(df, pd.read_excel(self.result_file), how='left', on='Company Name', suffixes=('', '_old'))
+        df['formatted company name'] = df['Company Name'].str.replace(r"([\.\,\(\)\\\/])", "", regex=True)
+        df['formatted company name'] = df['formatted company name'].str.lower()
+        df['formatted company name'] = df['formatted company name'].str.strip()
         return df
+
+    def rpd_data_frame(self) -> pd.DataFrame:
+        """
+        Returns a data frame with the existing RPD information
+
+        :return:
+        """
+        return pd.read_excel(self.result_file, dtype={'iconum': str})
+
+    def create_main_data_frame(self):
+        """
+        Creates the main data frame that has IPO and RPD information.
+        Here the data is concatenated and rows without RPD information are dropped if they have the same formatted name.
+
+        :return:
+        """
+        df = pd.concat([self.df_ipo, self.df_rpd], ignore_index=True)
+        df.sort_values(by=['RPD Creation Date'], inplace=True)
+        df.drop_duplicates(subset='formatted company name', inplace=True, ignore_index=True)
+        return df
+
 
     def create_session(self) -> requests.Session:
         """
         Creates a session using the uername and password provided in the config file.
+
         :return: A session that will be used in RPDCreation
         """
         uname = self.config.get('credentials', 'username')
@@ -59,79 +89,160 @@ class RPDCreation:
         session = requests.Session()
         session.auth = HttpNtlmAuth(uname, pword, session)
         return session
-    
-    def update_rpds(self, separator: str = ':  '):
+
+    def get_rpd_status(self, rpd_num: int) -> str:
         """
-        Updating existing RPDs when either the IPO Date or CUSIP has changed.
-        Previous information like the IPO Date and CUSIP that were originally entered into the RPD have _old appended
-        to the column. The _old columns will not be saved so there is no need to update the main data frame.
+        Return the status of the RPD number provided
+
+        :param rpd_num: the number identifying the RPD
+        :return: RPD status as text
+        """
+        status_endpoint = self.base_url + f"rpd/{rpd_num}/Status"
+        res_status = self.session.get(url=status_endpoint, headers=self.headers)
+        if res_status.ok:
+            return res_status.text.replace('"', '')
+
+    def get_rpd_resolution(self, rpd_num: int) -> json:
+        """
+        Returns the resolution for resolved RPDs
+        If the RPD has not been resolved, the API will return 'null'
+
+        :param rpd_num: the number identifying the RPD
+        :return:
+        """
+        resolution_endpoint = self.base_url + f"rpd/{rpd_num}/Resolution"
+        res_resolution = self.session.get(url=resolution_endpoint, headers=self.headers)
+        if res_resolution.ok and res_resolution.text != 'null':
+            return json.loads(res_resolution.text)
+
+    def update_withdrawn_ipos(self, separator: str = ':  '):
+        """
+        If an IPO is withdrawn, the RPD will be updated with a comment showing that the status is withdrawn
+        and in the main data frame the RPD Status will be set to Resolved (so that I no longer update the RPD).
+
         :param separator: A separator is added to the columns to make the RPD comment more readable.
         :return:
         """
-        df_rpd = self.df.copy()
-        df_rpd = df_rpd.loc[df_rpd['RPD Number'].notna()]
+        df_wd = pd.merge(self.df_wd, self.df_rpd, how='inner', on='formatted company name', suffixes=('', '_'))
+        if len(df_wd) > 0:
+            df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
+            df_wd['Last Checked'] = df_wd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            df_wd = df_wd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
+                           'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'RPD Number', 'RPD Link',
+                           'RPD Creation Date', 'RPD Status']]
+            df_wd.replace(np.nan, '', inplace=True)
+            logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
+            # adding separator to columns to make it more readable in the RPD
+            df_wd.columns = [col + separator for col in df_wd.columns]
+            for idx, row in df_wd.iterrows():
+                rpd = int(row['RPD Number' + separator])
+                ipo_string = df_wd.loc[idx].drop([c for c in df_wd.columns if 'RPD' in c]).to_string(na_rep='').replace('\n', '<br>')
+                comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
+                rpd_comment = {'Content': ipo_string}
+                res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
+                self.df.loc[self.df['RPD Number'] == rpd, 'Status'] = 'Withdrawn'
+                self.df.loc[self.df['RPD Number'] == rpd, 'RPD Status'] = 'Resolved'
+
+    def update_rpds(self, separator: str = ':  '):
+        """
+        Updating existing RPDs when either the IPO Date, CUSIP or Symbol have changed.
+        The data is merged so that I can see what data has changed (if any).
+
+        :param separator: A separator is added to the columns to make the RPD comment more readable.
+        :return:
+        """
+        df_rpd = pd.merge(self.df_ipo, self.df_rpd, how='left', on='formatted company name', suffixes=('', '_old'))
+        df_rpd = df_rpd.loc[
+            (df_rpd['RPD Number'].notna())
+            & (df_rpd['RPD Status'] != 'Resolved')
+        ]
+        # only make one update per RPD using the latest information
+        df_rpd.sort_values(by=['Last Checked'], ascending=False, inplace=True)
+        df_rpd.drop_duplicates(subset='RPD Number', inplace=True, ignore_index=True)
+        # compare the data
         df_rpd['IPO Date Comparison'] = df_rpd['IPO Date'] == df_rpd['IPO Date_old']
         df_rpd['Market Comparison'] = df_rpd['Market'] == df_rpd['Market_old']
         df_rpd['CUSIP Comparison'] = df_rpd['CUSIP'] == df_rpd['CUSIP_old']
         df_rpd.loc[df_rpd['CUSIP'].isna(), 'CUSIP Comparison'] = True
         df_rpd['Symbol Comparison'] = df_rpd['Symbol'] == df_rpd['Symbol_old']
         df_rpd.loc[df_rpd['Symbol'].isna(), 'Symbol Comparison'] = True
+        # filter for only updated data (i.e. where comparison is False)
         df_rpd = df_rpd.loc[
             (~df_rpd['IPO Date Comparison'])
             | (~df_rpd['CUSIP Comparison'])
             | (~df_rpd['Symbol Comparison'])
-            | (~df_rpd['Market Comparison'])
+            # | (~df_rpd['Market Comparison'])
         ]
+        # format the data frame to make it RPD friendly
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
         df_rpd['Last Checked'] = df_rpd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_rpd = df_rpd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 
                          'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'RPD Number', 'RPD Link',
                          'RPD Creation Date']]
-        logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join(df_rpd['RPD Number'].to_list())}")
         df_rpd.replace(np.nan, '', inplace=True)
+        logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join([str(int(num)) for num in df_rpd['RPD Number'].to_list()])}")
         # adding separator to columns to make it more readable in the RPD
         df_rpd.columns = [col + separator for col in df_rpd.columns]
         for idx, row in df_rpd.iterrows():
             rpd = int(row['RPD Number' + separator])
-            fds_cusip = str(row['CUSIP' + separator])
-            ipo_date = str(row['IPO Date' + separator])
-            ticker = str(row['Symbol' + separator])
-            exchange = str(row['Market' + separator])
-            ipo_string = df_rpd.loc[idx].drop([c for c in df_rpd.columns if 'RPD' in c]).to_string(na_rep='').replace('\n', '<br>')
-            comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
-            rpd_comment = {'Content': ipo_string}
-            res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
+            rpd_status = self.get_rpd_status(rpd)
+            # update the main data frame with the status
+            self.df.loc[self.df['RPD Number'] == rpd, 'RPD Status'] = rpd_status
+            if rpd_status == 'Resolved':
+                rpd_resolution = self.get_rpd_resolution(rpd)
+                dupe_rpd = rpd_resolution.get('DuplicateRPD')
+                if dupe_rpd:
+                    # if RPD is resolved and not a duplicate dupe_rpd will be None
+                    # if this RPD was resolved as a duplicate RPD, update the main data frame with the new RPD number
+                    # not updating comments of the dupe RPD since that should already be done in the row for that RPD
+                    self.df.loc[self.df['RPD Number'] == rpd, 'RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + str(dupe_rpd)
+                    self.df.loc[self.df['RPD Number'] == rpd, 'RPD Number'] = dupe_rpd
+                    rpd = dupe_rpd
+            else:
+                # only adding comments to RPDs that have not been resolved (will still add comments to completed RPDs)
+                fds_cusip = str(row['CUSIP' + separator])
+                ipo_date = str(row['IPO Date' + separator])
+                ticker = str(row['Symbol' + separator])
+                exchange = str(row['Market' + separator])
+                ipo_string = df_rpd.loc[idx].drop([c for c in df_rpd.columns if 'RPD' in c]).to_string(na_rep='').replace('\n', '<br>')
+                comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
+                rpd_comment = {'Content': ipo_string}
+                res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
 
-            question_endpoint = self.base_url + f'rpd/{int(rpd)}/questions'
-            questions = [
-                    {
-                        'Id': 31407,
-                        'Answers': [{'AnswerValue': fds_cusip}]
-                    },
-                    {
-                        'Id': 31405,
-                        'Answers': [{'AnswerValue': ipo_date}]
-                    },
-                    {
-                        'Id': 31406,
-                        'Answers': [{'AnswerValue': exchange}]
-                    },
-                    {
-                        'Id': 31408,
-                        'Answers': [{'AnswerValue': ticker}]
-                    }
-                ]
-            res_q = self.session.post(question_endpoint, data=json.dumps(questions), headers=self.headers)
+                question_endpoint = self.base_url + f'rpd/{int(rpd)}/questions'
+                questions = [
+                        {
+                            'Id': 31407,
+                            'Answers': [{'AnswerValue': fds_cusip}]
+                        },
+                        {
+                            'Id': 31405,
+                            'Answers': [{'AnswerValue': ipo_date}]
+                        },
+                        {
+                            'Id': 31406,
+                            'Answers': [{'AnswerValue': exchange}]
+                        },
+                        {
+                            'Id': 31408,
+                            'Answers': [{'AnswerValue': ticker}]
+                        }
+                    ]
+                res_q = self.session.post(question_endpoint, data=json.dumps(questions), headers=self.headers)
 
     def create_new_rpds(self, separator: str = ':  ') -> dict:
         """
         Creates new RPDs for all the IPOs that currently do not have an RPD.
+
         :param separator: A separator is added to the columns to make the RPD comment more readable.
         :return: Dictionary with data about the new RPDs created
         """
+        endpoint = self.base_url + 'rpd'
         rpd_dict = defaultdict(list)
         df_rpd = self.df.copy()
+        # filtering for only IPOs that do not have an RPD Number
         df_rpd = df_rpd.loc[df_rpd['RPD Number'].isna()]
+        # formatting for RPD comments
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
         df_rpd['Last Checked'] = df_rpd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_rpd = df_rpd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
@@ -171,7 +282,7 @@ class RPDCreation:
                     }
                 ]
             }
-            res = self.session.post(url=self.endpoint, data=json.dumps(rpd_request), headers=self.headers)
+            res = self.session.post(url=endpoint, data=json.dumps(rpd_request), headers=self.headers)
             if res.ok:
                 rpd_num = res.headers['X-IS-ID']
                 rpd_date = res.headers['Date']
@@ -180,21 +291,23 @@ class RPDCreation:
                 rpd_dict['RPD Number'].append(rpd_num)
                 rpd_dict['RPD Link'].append('https://is.factset.com/rpd/summary.aspx?messageId=' + str(rpd_num))
                 rpd_dict['RPD Creation Date'].append(rpd_date)
+                rpd_dict['RPD Status'].append('Pending')
             sleep(1)
-        logger.info(f"Created {len(rpd_dict)} new RPDs: {', '.join([str(num) for num in rpd_dict['RPD Number']])}")
+        logger.info(f"Created {len(rpd_dict['RPD Number'])} new RPDs: {', '.join([str(num) for num in rpd_dict['RPD Number']])}")
         return rpd_dict
 
     def add_new_rpds(self):
         """
         Creates a data frame from the dictionary returned by create_new_rpds and adds the new RPD information to
         the main data frame.
+
         :return:
         """
         rpd_dict = self.create_new_rpds()
-        if rpd_dict is not None and len(rpd_dict) > 0:
+        if rpd_dict is not None and len(rpd_dict['RPD Number']) > 0:
             df_rpd = pd.DataFrame(rpd_dict)
-            df_rpd['RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + df_rpd['RPD Number'].astype(str)
             df_rpd['RPD Creation Date'] = pd.to_datetime(df_rpd['RPD Creation Date'].fillna(pd.NaT), errors='coerce').dt.tz_localize(None)
+            # adding new data to main data frame
             self.df = pd.merge(self.df, df_rpd, how='left', on='Company Name', suffixes=('', '_new'))
             fillna_dict = {
                 'RPD Number': 'RPD Number_new',
@@ -206,6 +319,7 @@ class RPDCreation:
     def save_results(self):
         """
         Closes the session and saves the results of the updated data frame.
+
         :return:
         """
         self.session.close()
@@ -221,15 +335,18 @@ class RPDCreation:
                            'Notes',
                            'Last Checked',
                            'IPO Deal ID',
+                           'formatted company name',
                            'RPD Number',
                            'RPD Link',
-                           'RPD Creation Date']]
+                           'RPD Creation Date',
+                           'RPD Status']]
         self.df.to_excel(self.result_file, index=False, encoding='utf-8-sig')
 
 
 def resolve_rpds():
     """
     Used to resolve RPDs in bulk.
+
     :return:
     """
     config = configparser.ConfigParser()
@@ -258,6 +375,7 @@ def resolve_rpds():
 def main():
     try:
         rpd = RPDCreation()
+        rpd.update_withdrawn_ipos()
         rpd.update_rpds()
         rpd.add_new_rpds()
         rpd.save_results()
