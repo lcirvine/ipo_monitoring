@@ -1,30 +1,30 @@
-source,type,exchange,notes,url
-NYSE,website,NYSE,,https://www.nyse.com/ipo-center/filings
-NYSE Withdrawn,website,NYSE,,https://www.nyse.com/ipo-center/filings
-Nasdaq,website,NASDAQ,,https://www.nasdaq.com/market-activity/ipos?tab=upcoming
-Nasdaq Priced,website,NASDAQ,,https://www.nasdaq.com/market-activity/ipos?tab=upcoming
-Nasdaq Withdrawn,website,NASDAQ,,https://www.nasdaq.com/market-activity/ipos?tab=upcoming
-JPX,website,Japan Exchange Group,,https://www.jpx.co.jp/english/listing/stocks/new/
-Shanghai,website,Shanghai Stock Exchange,,http://ipo.sseinfo.com/info/xgfxyl/
-Euronext,website,Euronext,,https://live.euronext.com/en/ipo-showcase
-AAStocks,website,Hong Kong Exchange,,https://www.aastocks.com/en/stocks/market/ipo/upcomingipo/company-summary
-LSE,website,London Stock Exchange,,https://www.londonstockexchange.com/exchange/prices-and-markets/stocks/new-and-recent-issues/new-recent-issues-home.html
-CNInfo,website,Shenzhen Stock Exchange,,http://www.cninfo.com.cn/eipo/index.jsp?COLLCC=1039335625&
-BS-TSX,website,Toronto Stock Exchange,,https://www.baystreet.ca/articles/ipo_tsx.aspx
-BS-TSXV,website,TSX Venture,,https://www.baystreet.ca/articles/ipo_tsxv.aspx
-TSX,website,Toronto Stock Exchange,"used as a secondary source since IPOs are retroactively added to this list, this also has the listing date instead of the trading date",https://www.tsx.com/news/new-company-listings
-Frankfurt,website,Deutsche Boerse,,https://www.deutsche-boerse-cash-market.com/dbcm-en/instruments-statistics/statistics/primary-market-statistics/432!search?&hitsPerPage=50
-KRX,website,Korea Exchange,,https://global.krx.co.kr/contents/GLB/03/0306/0306010000/GLB0306010000.jsp
-TWSE,website,Taiwan Stock Exchange,,https://www.twse.com.tw/en/page/listed/listed_company/new_listing.html
-BME,website,BME Spanish Exchanges,,https://www.bolsamadrid.es/ing/aspx/Empresas/Admisiones.aspx
-SGX,website,Singapore Exchange,,https://www.sgx.com/securities/ipo-performance
-IDX,website,Indonesia Stock Exchange,,https://www.idx.co.id/en-us/listed-companies/listing-activities/
-BM,website,Bursa Malaysia,,https://www.bursamalaysia.com/listing/listing_resources/ipo/ipo_summary
-BIT,website,Borsa Italiana,,https://www.borsaitaliana.it/azioni/ipoematricole/ipo-home.en.htm
-IPOScoop,website,NYSE and Nasdaq,used as a secondary source for IPOs not already included in Nasdaq or NYSE,https://www.iposcoop.com/ipo-calendar/
-NasdaqNordic,website,Multiple,,http://www.nasdaqomxnordic.com/
-Spotlight,website,Spotlight,,https://spotlightstockmarket.com/en/market-overview/listings/
-East Money,website,"Shanghai Stock Exchange, Shenzhen Stock Exchange","used as a secondary source for IPOs not already included in Shanghai and Shenzhen, primarily provides expected IPO date",http://data.eastmoney.com/xg/xg/default.html
-ASX,website,Australian Securities Exchange,website has to be scraped separately,https://www2.asx.com.au/listings/upcoming-floats-and-listings
-TKIPO,website,Japan Exchange Group,website has to be scraped separately,http://www.tokyoipo.com/top/iposche/index.php?j_e=E
-AlphaVantage,API,NYSE and Nasdaq,,
+source,exchange,type,url,notes
+NYSE,NYSE,website,https://www.nyse.com/ipo-center/filings,
+NYSE Withdrawn,NYSE,website,https://www.nyse.com/ipo-center/filings,
+Nasdaq,NASDAQ,website,https://www.nasdaq.com/market-activity/ipos?tab=upcoming,
+Nasdaq Priced,NASDAQ,website,https://www.nasdaq.com/market-activity/ipos?tab=upcoming,
+Nasdaq Withdrawn,NASDAQ,website,https://www.nasdaq.com/market-activity/ipos?tab=upcoming,
+JPX,Japan Exchange Group,website,https://www.jpx.co.jp/english/listing/stocks/new/,
+Shanghai,Shanghai Stock Exchange,website,http://ipo.sseinfo.com/info/xgfxyl/,
+Euronext,Euronext,website,https://live.euronext.com/en/ipo-showcase,
+AAStocks,Hong Kong Exchange,website,https://www.aastocks.com/en/stocks/market/ipo/upcomingipo/company-summary,
+LSE,London Stock Exchange,website,https://www.londonstockexchange.com/exchange/prices-and-markets/stocks/new-and-recent-issues/new-recent-issues-home.html,
+CNInfo,Shenzhen Stock Exchange,website,http://www.cninfo.com.cn/eipo/index.jsp?COLLCC=1039335625&,
+BS-TSX,Toronto Stock Exchange,website,https://www.baystreet.ca/articles/ipo_tsx.aspx,
+BS-TSXV,TSX Venture,website,https://www.baystreet.ca/articles/ipo_tsxv.aspx,
+TSX,Toronto Stock Exchange,website,https://www.tsx.com/news/new-company-listings,"used as a secondary source since IPOs are retroactively added to this list, this also has the listing date instead of the trading date"
+Frankfurt,Deutsche Boerse,website,https://www.deutsche-boerse-cash-market.com/dbcm-en/instruments-statistics/statistics/primary-market-statistics/432!search?&hitsPerPage=50,transfer listings are dropped
+KRX,Korea Exchange,website,https://global.krx.co.kr/contents/GLB/03/0306/0306010000/GLB0306010000.jsp,
+TWSE,Taiwan Stock Exchange,website,https://www.twse.com.tw/en/page/listed/listed_company/new_listing.html,
+BME,BME Spanish Exchanges,website,https://www.bolsamadrid.es/ing/aspx/Empresas/Admisiones.aspx,rows for 'integration' (transfer listings) are dropped
+SGX,Singapore Exchange,website,https://www.sgx.com/securities/ipo-performance,
+IDX,Indonesia Stock Exchange,website,https://www.idx.co.id/en-us/listed-companies/listing-activities/,
+BM,Bursa Malaysia,website,https://www.bursamalaysia.com/listing/listing_resources/ipo/ipo_summary,
+BIT,Borsa Italiana,website,https://www.borsaitaliana.it/azioni/ipoematricole/ipo-home.en.htm,
+IPOScoop,NYSE and Nasdaq,website,https://www.iposcoop.com/ipo-calendar/,"used as a secondary source for IPOs not already included in Nasdaq or NYSE, rows with 'Week Of' dates are dropped from results"
+NasdaqNordic,Multiple,website,http://www.nasdaqomxnordic.com/,
+Spotlight,Spotlight,website,https://spotlightstockmarket.com/en/market-overview/listings/,
+East Money,"Shanghai Stock Exchange, Shenzhen Stock Exchange",website,http://data.eastmoney.com/xg/xg/default.html,"used as a secondary source for IPOs not already included in Shanghai and Shenzhen, primarily provides expected IPO date"
+ASX,Australian Securities Exchange,website,https://www2.asx.com.au/listings/upcoming-floats-and-listings,website has to be scraped separately
+TKIPO,Japan Exchange Group,website,http://www.tokyoipo.com/top/iposche/index.php?j_e=E,"website has to be scraped separately, secondary source for JPX used mainly for expected price dates, rows without price expected date or price range expected date are dropped"
+AlphaVantage,NYSE and Nasdaq,API,,"also includes new listing of securities that are not IPOs (like warrants and ETFs) which are dropped, those are identified by price high and price low both being 0"
