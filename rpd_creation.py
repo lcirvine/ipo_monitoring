@@ -77,7 +77,6 @@ class RPDCreation:
         df.drop_duplicates(subset='formatted company name', inplace=True, ignore_index=True)
         return df
 
-
     def create_session(self) -> requests.Session:
         """
         Creates a session using the uername and password provided in the config file.
@@ -173,12 +172,16 @@ class RPDCreation:
             | (~df_rpd['Symbol Comparison'])
             # | (~df_rpd['Market Comparison'])
         ]
+        # update the main data frame with updated data to prevent from making the same comment multiple times
+        # note this will only update when IPO date, CUSIP or Symbol have changed. Other changes won't be added.
+        df_rpd = df_rpd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
+                         'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'formatted company name', 'RPD Number',
+                         'RPD Link', 'RPD Creation Date', 'RPD Status']]
+        self.df = pd.concat([self.df, df_rpd], ignore_index=True).drop_duplicates(subset=['RPD Number', 'formatted company name'], keep='last')
         # format the data frame to make it RPD friendly
+        df_rpd.drop(columns=['formatted company name'], inplace=True)
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
         df_rpd['Last Checked'] = df_rpd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_rpd = df_rpd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range', 
-                         'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'RPD Number', 'RPD Link',
-                         'RPD Creation Date']]
         df_rpd.replace(np.nan, '', inplace=True)
         logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join([str(int(num)) for num in df_rpd['RPD Number'].to_list()])}")
         # adding separator to columns to make it more readable in the RPD
