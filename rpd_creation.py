@@ -173,6 +173,7 @@ class RPDCreation:
                          'RPD Link', 'RPD Creation Date', 'RPD Status']]
         self.df = pd.concat([self.df, df_rpd], ignore_index=True).drop_duplicates(subset=['RPD Number', 'formatted company name'], keep='last')
         logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join([str(int(num)) for num in df_rpd['RPD Number'].to_list()])}")
+        df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
         for idx, row in df_rpd[self.rpd_cols].iterrows():
             rpd = int(row['RPD Number'])
             rpd_status = self.get_rpd_status(rpd)
@@ -190,7 +191,7 @@ class RPDCreation:
             else:
                 # only adding comments to RPDs that have not been resolved (will still add comments to completed RPDs)
                 fds_cusip = str(row['CUSIP'])
-                ipo_date = row['IPO Date'].strftime('%Y-%m-%d')
+                ipo_date = str(row['IPO Date'])
                 ticker = str(row['Symbol'])
                 exchange = str(row['Market'])
                 ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
@@ -231,12 +232,13 @@ class RPDCreation:
         df_rpd = self.df.copy()
         # filtering for only IPOs that do not have an RPD Number
         df_rpd = df_rpd.loc[df_rpd['RPD Number'].isna()]
+        df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
         for idx, row in df_rpd[self.rpd_cols].iterrows():
             ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
             company_name = str(row['Company Name'])
             exchange = str(row['Market'])
             fds_cusip = str(row['CUSIP'])
-            ipo_date = row['IPO Date'].strftime('%Y-%m-%d')
+            ipo_date = str(row['IPO Date'])
             ticker = str(row['Symbol'])
             rpd_request = {
                 'Title': f"{company_name} - {exchange}",
