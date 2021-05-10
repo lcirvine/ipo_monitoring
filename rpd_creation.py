@@ -125,8 +125,6 @@ class RPDCreation:
         """
         df_wd = pd.merge(self.df_wd, self.df_rpd, how='inner', on='formatted company name', suffixes=('', '_'))
         if len(df_wd) > 0:
-            df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
-            df_wd['Last Checked'] = df_wd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
             logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
             for idx, row in df_wd[self.rpd_cols].iterrows():
                 rpd = int(row['RPD Number'])
