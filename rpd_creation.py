@@ -125,6 +125,7 @@ class RPDCreation:
         """
         df_wd = pd.merge(self.df_wd, self.df_rpd, how='inner', on='formatted company name', suffixes=('', '_'))
         if len(df_wd) > 0:
+            df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
             logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
             for idx, row in df_wd[self.rpd_cols].iterrows():
                 rpd = int(row['RPD Number'])
@@ -189,7 +190,7 @@ class RPDCreation:
             else:
                 # only adding comments to RPDs that have not been resolved (will still add comments to completed RPDs)
                 fds_cusip = str(row['CUSIP'])
-                ipo_date = str(row['IPO Date'])
+                ipo_date = row['IPO Date'].strftime('%Y-%m-%d')
                 ticker = str(row['Symbol'])
                 exchange = str(row['Market'])
                 ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
@@ -235,7 +236,7 @@ class RPDCreation:
             company_name = str(row['Company Name'])
             exchange = str(row['Market'])
             fds_cusip = str(row['CUSIP'])
-            ipo_date = str(row['IPO Date'])
+            ipo_date = row['IPO Date'].strftime('%Y-%m-%d')
             ticker = str(row['Symbol'])
             rpd_request = {
                 'Title': f"{company_name} - {exchange}",
