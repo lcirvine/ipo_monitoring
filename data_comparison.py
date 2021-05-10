@@ -107,8 +107,11 @@ class DataComparison:
                    'last_updated_date_utc']
         df_outer = pd.merge(self.merge_entity_data(), self.df_pp[pp_cols], how='outer', on='iconum',
                             suffixes=('_external', '_fds'))
-        df_outer['IPO Date'] = pd.to_datetime(df_outer['IPO Date'].fillna(pd.NaT), errors='coerce')
-        df_outer['trading_date'] = pd.to_datetime(df_outer['trading_date'].fillna(pd.NaT), errors='coerce')
+        for c in ['IPO Date', 'trading_date']:
+            try:
+                df_outer[c] = pd.to_datetime(df_outer[c].fillna(pd.NaT), errors='coerce')
+            except Exception as e:
+                logger.error(f"{c} - {e}")
         df_ipo = df_outer.loc[
             (df_outer['IPO Date'].dt.date >= date.today())
             | (df_outer['trading_date'].dt.date >= date.today())
