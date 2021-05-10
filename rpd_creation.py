@@ -1,7 +1,6 @@
 import os
 import sys
 import pandas as pd
-import numpy as np
 import configparser
 import requests
 from requests_ntlm import HttpNtlmAuth
@@ -27,6 +26,8 @@ class RPDCreation:
         self.session = self.create_session()
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         self.base_url = 'http://is.factset.com/rpd/api/v2/'
+        self.rpd_cols = ['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
+                         'Status', 'Notes', 'Last Checked', 'IPO Deal ID']
 
     @staticmethod
     def return_formatted_df_from_file(file: str):
@@ -114,7 +115,7 @@ class RPDCreation:
         if res_resolution.ok and res_resolution.text != 'null':
             return json.loads(res_resolution.text)
 
-    def update_withdrawn_ipos(self, separator: str = ':  '):
+    def update_withdrawn_ipos(self):
         """
         If an IPO is withdrawn, the RPD will be updated with a comment showing that the status is withdrawn
         and in the main data frame the RPD Status will be set to Resolved (so that I no longer update the RPD).
@@ -126,23 +127,17 @@ class RPDCreation:
         if len(df_wd) > 0:
             df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
             df_wd['Last Checked'] = df_wd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            df_wd = df_wd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
-                           'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'RPD Number', 'RPD Link',
-                           'RPD Creation Date', 'RPD Status']]
-            df_wd.replace(np.nan, '', inplace=True)
             logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
-            # adding separator to columns to make it more readable in the RPD
-            df_wd.columns = [col + separator for col in df_wd.columns]
-            for idx, row in df_wd.iterrows():
-                rpd = int(row['RPD Number' + separator])
-                ipo_string = df_wd.loc[idx].drop([c for c in df_wd.columns if 'RPD' in c]).to_string(na_rep='').replace('\n', '<br>')
+            for idx, row in df_wd[self.rpd_cols].iterrows():
+                rpd = int(row['RPD Number'])
+                ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
                 comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
-                rpd_comment = {'Content': ipo_string}
+                rpd_comment = {'Content': ipo_html}
                 res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
                 self.df.loc[self.df['RPD Number'] == rpd, 'Status'] = 'Withdrawn'
                 self.df.loc[self.df['RPD Number'] == rpd, 'RPD Status'] = 'Resolved'
 
-    def update_rpds(self, separator: str = ':  '):
+    def update_rpds(self):
         """
         Updating existing RPDs when either the IPO Date, CUSIP or Symbol have changed.
         The data is merged so that I can see what data has changed (if any).
@@ -178,16 +173,9 @@ class RPDCreation:
                          'Status', 'Notes', 'Last Checked', 'IPO Deal ID', 'formatted company name', 'RPD Number',
                          'RPD Link', 'RPD Creation Date', 'RPD Status']]
         self.df = pd.concat([self.df, df_rpd], ignore_index=True).drop_duplicates(subset=['RPD Number', 'formatted company name'], keep='last')
-        # format the data frame to make it RPD friendly
-        df_rpd.drop(columns=['formatted company name'], inplace=True)
-        df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
-        df_rpd['Last Checked'] = df_rpd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_rpd.replace(np.nan, '', inplace=True)
         logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join([str(int(num)) for num in df_rpd['RPD Number'].to_list()])}")
-        # adding separator to columns to make it more readable in the RPD
-        df_rpd.columns = [col + separator for col in df_rpd.columns]
-        for idx, row in df_rpd.iterrows():
-            rpd = int(row['RPD Number' + separator])
+        for idx, row in df_rpd[self.rpd_cols].iterrows():
+            rpd = int(row['RPD Number'])
             rpd_status = self.get_rpd_status(rpd)
             # update the main data frame with the status
             self.df.loc[self.df['RPD Number'] == rpd, 'RPD Status'] = rpd_status
@@ -200,16 +188,15 @@ class RPDCreation:
                     # not updating comments of the dupe RPD since that should already be done in the row for that RPD
                     self.df.loc[self.df['RPD Number'] == rpd, 'RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + str(dupe_rpd)
                     self.df.loc[self.df['RPD Number'] == rpd, 'RPD Number'] = dupe_rpd
-                    rpd = dupe_rpd
             else:
                 # only adding comments to RPDs that have not been resolved (will still add comments to completed RPDs)
-                fds_cusip = str(row['CUSIP' + separator])
-                ipo_date = str(row['IPO Date' + separator])
-                ticker = str(row['Symbol' + separator])
-                exchange = str(row['Market' + separator])
-                ipo_string = df_rpd.loc[idx].drop([c for c in df_rpd.columns if 'RPD' in c]).to_string(na_rep='').replace('\n', '<br>')
+                fds_cusip = str(row['CUSIP'])
+                ipo_date = str(row['IPO Date'])
+                ticker = str(row['Symbol'])
+                exchange = str(row['Market'])
+                ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
                 comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
-                rpd_comment = {'Content': ipo_string}
+                rpd_comment = {'Content': ipo_html}
                 res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
 
                 question_endpoint = self.base_url + f'rpd/{int(rpd)}/questions'
@@ -233,7 +220,7 @@ class RPDCreation:
                     ]
                 res_q = self.session.post(question_endpoint, data=json.dumps(questions), headers=self.headers)
 
-    def create_new_rpds(self, separator: str = ':  ') -> dict:
+    def create_new_rpds(self) -> dict:
         """
         Creates new RPDs for all the IPOs that currently do not have an RPD.
 
@@ -245,24 +232,17 @@ class RPDCreation:
         df_rpd = self.df.copy()
         # filtering for only IPOs that do not have an RPD Number
         df_rpd = df_rpd.loc[df_rpd['RPD Number'].isna()]
-        # formatting for RPD comments
-        df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
-        df_rpd['Last Checked'] = df_rpd['Last Checked'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_rpd = df_rpd[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
-                         'Status', 'Notes', 'Last Checked', 'IPO Deal ID']]
-        df_rpd.replace(np.nan, '', inplace=True)
-        df_rpd.columns = [col + separator for col in df_rpd.columns]
-        for idx, row in df_rpd.iterrows():
-            ipo_string = df_rpd.loc[idx].to_string(na_rep='').replace('\n', '<br>')
-            company_name = str(row['Company Name' + separator])
-            exchange = str(row['Market' + separator])
-            fds_cusip = str(row['CUSIP' + separator])
-            ipo_date = str(row['IPO Date' + separator])
-            ticker = str(row['Symbol' + separator])
+        for idx, row in df_rpd[self.rpd_cols].iterrows():
+            ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
+            company_name = str(row['Company Name'])
+            exchange = str(row['Market'])
+            fds_cusip = str(row['CUSIP'])
+            ipo_date = str(row['IPO Date'])
+            ticker = str(row['Symbol'])
             rpd_request = {
                 'Title': f"{company_name} - {exchange}",
                 'Products': [{'Id': '106317'}],
-                'Content': ipo_string,
+                'Content': ipo_html,
                 'Type': 'EnhancementRequest',
                 'Priority': 'Medium',
                 'Severity': 'Medium',
