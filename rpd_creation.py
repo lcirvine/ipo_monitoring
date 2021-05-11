@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+import numpy as np
 import configparser
 import requests
 from requests_ntlm import HttpNtlmAuth
@@ -127,6 +128,7 @@ class RPDCreation:
         if len(df_wd) > 0:
             df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
             logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
+            df_wd.replace(np.nan, '', inplace=True)
             for idx, row in df_wd.iterrows():
                 rpd = int(row['RPD Number'])
                 ipo_html = row[self.rpd_cols].to_frame().to_html(header=False, na_rep='', justify='left')
@@ -173,6 +175,7 @@ class RPDCreation:
         self.df = pd.concat([self.df, df_rpd], ignore_index=True).drop_duplicates(subset=['RPD Number', 'formatted company name'], keep='last')
         logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join([str(int(num)) for num in df_rpd['RPD Number'].to_list()])}")
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
+        df_rpd.replace(np.nan, '', inplace=True)
         for idx, row in df_rpd.iterrows():
             rpd = int(row['RPD Number'])
             rpd_status = self.get_rpd_status(rpd)
@@ -232,6 +235,7 @@ class RPDCreation:
         # filtering for only IPOs that do not have an RPD Number
         df_rpd = df_rpd.loc[df_rpd['RPD Number'].isna()]
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
+        df_rpd.replace(np.nan, '', inplace=True)
         for idx, row in df_rpd.iterrows():
             company_name = str(row['Company Name'])
             exchange = str(row['Market'])
