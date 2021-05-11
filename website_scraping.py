@@ -234,10 +234,17 @@ class WebDriver:
                             Can be given either as a list of columns or a string with the column name.
         :return: DataFrame
         """
-        # make sure the same columns exist in old_df and new_df
-        # otherwise it will cause an error when setting data type of new_df the same as old_df
-        # 'Only a column name can be used for the key in a dtype mappings argument.'
-        df = pd.concat([old_df, new_df.astype(old_df.dtypes)], ignore_index=True, sort=False)
+        try:
+            df = pd.concat([old_df, new_df.astype(old_df.dtypes)], ignore_index=True, sort=False)
+        except KeyError as ke:
+            logger.error(ke)
+            logger.info(f"Existing df columns: {', '.join(old_df.columns)}")
+            logger.info(f"New df columns: {', '.join(new_df.columns)}")
+        except ValueError as ve:
+            logger.error(ve)
+            logger.info(f"Existing df data types: \n{old_df.dtypes.to_string(na_rep='')}")
+            logger.info(f"New df data types: \n{new_df.dtypes.to_string(na_rep='')}")
+            df = pd.concat([old_df, new_df], ignore_index=True, sort=False)
         if exclude_col and isinstance(exclude_col, str):
             ss = [col for col in df.columns.to_list() if col != exclude_col]
         elif exclude_col and isinstance(exclude_col, list):

@@ -685,7 +685,7 @@ sources_dict = {
         'columns': [
             'Company Name',
             'Last',
-            '%',
+            'Percent Change',
             'IPO Date'
         ],
         'file': 'NasdaqNordic'
