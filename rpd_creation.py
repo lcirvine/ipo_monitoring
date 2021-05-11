@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+import numpy as np
 import configparser
 import requests
 from requests_ntlm import HttpNtlmAuth
@@ -53,8 +54,9 @@ class RPDCreation:
             df[col].fillna(df[fill_val], inplace=True)
         df = df[['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
                  'Status', 'Notes', 'Last Checked', 'IPO Deal ID']]
-        df['formatted company name'] = df['Company Name'].str.replace(r"([\.\,\(\)\\\/])", "", regex=True)
-        df['formatted company name'] = df['formatted company name'].str.lower()
+        df['formatted company name'] = df['Company Name'].str.lower()
+        df['formatted company name'] = df['formatted company name'].str.replace(r"([\.\,\(\)\\\/])", "", regex=True)
+        df['formatted company name'] = df['formatted company name'].str.replace(r"(\slimited$|\sltd|\ssa$|\sa/s$|\sinc$)", "", regex=True, case=False)
         df['formatted company name'] = df['formatted company name'].str.strip()
         return df
 
@@ -120,16 +122,16 @@ class RPDCreation:
         If an IPO is withdrawn, the RPD will be updated with a comment showing that the status is withdrawn
         and in the main data frame the RPD Status will be set to Resolved (so that I no longer update the RPD).
 
-        :param separator: A separator is added to the columns to make the RPD comment more readable.
         :return:
         """
         df_wd = pd.merge(self.df_wd, self.df_rpd, how='inner', on='formatted company name', suffixes=('', '_'))
         if len(df_wd) > 0:
             df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
             logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
-            for idx, row in df_wd[self.rpd_cols].iterrows():
+            df_wd.replace(np.nan, '', inplace=True)
+            for idx, row in df_wd.iterrows():
                 rpd = int(row['RPD Number'])
-                ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
+                ipo_html = row[self.rpd_cols].to_frame().to_html(header=False, na_rep='', justify='left')
                 comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
                 rpd_comment = {'Content': ipo_html}
                 res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
@@ -141,7 +143,6 @@ class RPDCreation:
         Updating existing RPDs when either the IPO Date, CUSIP or Symbol have changed.
         The data is merged so that I can see what data has changed (if any).
 
-        :param separator: A separator is added to the columns to make the RPD comment more readable.
         :return:
         """
         df_rpd = pd.merge(self.df_ipo, self.df_rpd, how='left', on='formatted company name', suffixes=('', '_old'))
@@ -174,7 +175,8 @@ class RPDCreation:
         self.df = pd.concat([self.df, df_rpd], ignore_index=True).drop_duplicates(subset=['RPD Number', 'formatted company name'], keep='last')
         logger.info(f"{len(df_rpd)} updates to make on existing RPDs: {', '.join([str(int(num)) for num in df_rpd['RPD Number'].to_list()])}")
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
-        for idx, row in df_rpd[self.rpd_cols].iterrows():
+        df_rpd.replace(np.nan, '', inplace=True)
+        for idx, row in df_rpd.iterrows():
             rpd = int(row['RPD Number'])
             rpd_status = self.get_rpd_status(rpd)
             # update the main data frame with the status
@@ -188,13 +190,14 @@ class RPDCreation:
                     # not updating comments of the dupe RPD since that should already be done in the row for that RPD
                     self.df.loc[self.df['RPD Number'] == rpd, 'RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + str(dupe_rpd)
                     self.df.loc[self.df['RPD Number'] == rpd, 'RPD Number'] = dupe_rpd
+                    self.df.loc[self.df['RPD Number'] == rpd, 'RPD Status'] = ''
             else:
                 # only adding comments to RPDs that have not been resolved (will still add comments to completed RPDs)
                 fds_cusip = str(row['CUSIP'])
                 ipo_date = str(row['IPO Date'])
                 ticker = str(row['Symbol'])
                 exchange = str(row['Market'])
-                ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
+                ipo_html = row[self.rpd_cols].to_frame().to_html(header=False, na_rep='', justify='left')
                 comment_endpoint = self.base_url + f'rpd/{int(rpd)}/comments'
                 rpd_comment = {'Content': ipo_html}
                 res_c = self.session.post(comment_endpoint, data=json.dumps(rpd_comment), headers=self.headers)
@@ -224,7 +227,6 @@ class RPDCreation:
         """
         Creates new RPDs for all the IPOs that currently do not have an RPD.
 
-        :param separator: A separator is added to the columns to make the RPD comment more readable.
         :return: Dictionary with data about the new RPDs created
         """
         endpoint = self.base_url + 'rpd'
@@ -233,13 +235,14 @@ class RPDCreation:
         # filtering for only IPOs that do not have an RPD Number
         df_rpd = df_rpd.loc[df_rpd['RPD Number'].isna()]
         df_rpd['IPO Date'] = df_rpd['IPO Date'].dt.strftime('%Y-%m-%d')
-        for idx, row in df_rpd[self.rpd_cols].iterrows():
-            ipo_html = row.to_frame().to_html(header=False, na_rep='', justify='left')
+        df_rpd.replace(np.nan, '', inplace=True)
+        for idx, row in df_rpd.iterrows():
             company_name = str(row['Company Name'])
             exchange = str(row['Market'])
             fds_cusip = str(row['CUSIP'])
             ipo_date = str(row['IPO Date'])
             ticker = str(row['Symbol'])
+            ipo_html = row[self.rpd_cols].to_frame().to_html(header=False, na_rep='', justify='left')
             rpd_request = {
                 'Title': f"{company_name} - {exchange}",
                 'Products': [{'Id': '106317'}],
