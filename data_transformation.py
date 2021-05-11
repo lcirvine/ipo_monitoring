@@ -425,6 +425,10 @@ class DataTransformation:
         df = self.src_dfs.get(file_name).copy()
         df = self.format_date_cols(df, ['IPO Date', 'time_checked'])
         df['Market'] = 'Nasdaq Nordic'
+        # Nasdaq Nordic comes with columns for last price and Percent Change change in price which change every day
+        df.drop(columns=['Last', 'Percent Change'], inplace=True)
+        df.sort_values(by='time_checked', inplace=True)
+        df.drop_duplicates(inplace=True)
         self.append_to_all(df)
 
     def spotlight(self):
