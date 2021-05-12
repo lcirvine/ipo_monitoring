@@ -109,8 +109,11 @@ class DataComparison:
                             suffixes=('_external', '_fds'))
         for c in ['IPO Date', 'trading_date']:
             try:
+                # putting this into try/except due to this bug https://github.com/pandas-dev/pandas/issues/39882
+                # should be fixed in pandas 1.3 due end of May https://github.com/pandas-dev/pandas/milestone/80
                 df_outer[c] = pd.to_datetime(df_outer[c].fillna(pd.NaT), errors='coerce')
             except Exception as e:
+                # Reindexing only valid with uniquely valued Index objects
                 logger.error(f"{c} - {e}")
         df_ipo = df_outer.loc[
             (df_outer['IPO Date'].dt.date >= date.today())
