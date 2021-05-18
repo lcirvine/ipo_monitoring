@@ -217,7 +217,7 @@ website_sources = {
             'online_purchase_limit',
             'success_rate',
             'announcement_of_winning_results',
-            'listing_date'
+            'ipo_date'
         ],
         'column_names_as_row': False,
         'file': 'Shanghai',

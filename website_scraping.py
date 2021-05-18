@@ -78,6 +78,7 @@ class WebDriver:
         link_elem = kwargs.get('link_elem')
         link_key = kwargs.get('link_key')
         cols = kwargs.get('columns')
+        column_names_as_row = kwargs.get('column_names_as_row')
 
         soup = self.return_soup()
         if table_attrs is None:
@@ -104,9 +105,9 @@ class WebDriver:
             df.columns = cols
             df = df.replace(r'^\s*$', np.nan, regex=True)
             df.dropna(how='all', inplace=True)
-            # Getting rid of rows that match the column headers in case headers have same element as rows
-            c = df.columns[1]
-            df = df.loc[df[c] != c]
+            # Some sources give the column headers as rows in the table
+            if column_names_as_row:
+                df = df.drop(0).reset_index(drop=True)
             df['time_checked'] = self.time_checked_str
             return df
 
@@ -117,10 +118,10 @@ class WebDriver:
             listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
             df = pd.DataFrame(listing_info)
             df.columns = ['listing_info']
-            df['Company Name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
-            df['IPO Date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
-            df['IPO Date'] = pd.to_datetime(df['IPO Date'], errors='coerce').dt.date
-            df['Market'] = 'Australian Stock Exchange'
+            df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
+            df['ipo_date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
+            df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
+            df['exchange'] = 'Australian Stock Exchange'
             df['time_checked'] = self.time_checked_str
             if df is not None:
                 s_file = os.path.join(self.source_data_folder, 'ASX.csv')
@@ -132,7 +133,6 @@ class WebDriver:
         except Exception as e:
             logger.error(f"ERROR for ASX")
             logger.error(e, exc_info=sys.exc_info())
-            logger.info('-' * 100)
             error_screenshot_file = f"ASX Error {self.time_checked.strftime('%Y-%m-%d %H%M')}.png"
             self.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
             self.webscraping_results.append([self.time_checked_str, 'ASX', 0])
@@ -154,26 +154,26 @@ class WebDriver:
                         row.append(cell_text)
             table_data.append(row)
             df = pd.DataFrame(table_data)
-            df.columns = ['Company Name', 'IPO Date', 'Symbol', 'Listed Shares', 'Blank_0', 'Price Range', 'Price',
-                          'Book Building Period', 'Opening Price', 'Change', 'Lead Underwriter', 'Business Description',
-                          'Blank_1']
+            df.columns = ['company_name', 'ipo_date', 'ticker', 'shares_outstanding', 'blank_0', 'price_range', 'price',
+                          'bookbuilding_period', 'opening_price', 'percent_change', 'underwriters',
+                          'business_description', 'blank_1']
             df.replace('', np.nan, inplace=True)
             df.dropna(how='all', inplace=True)
-            df.drop(columns=['Blank_0', 'Business Description', 'Blank_1'],  inplace=True, errors='ignore')
-            df['Company Name'] = df['Company Name'].str.strip()
-            df['Price Range Expected Date'] = df['Price Range'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
-            df['Price Expected Date'] = df['Price'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
-            df['Price'] = pd.to_numeric(df['Price'].str.replace(',', ''), errors='coerce')
+            df.drop(columns=['blank_0', 'business_description', 'blank_1'],  inplace=True, errors='ignore')
+            df['company_name'] = df['company_name'].str.strip()
+            df['price_range_expected_date'] = df['price_range'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
+            df['price_expected_date'] = df['price'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
+            df['price'] = pd.to_numeric(df['price'].str.replace(',', ''), errors='coerce')
             # date is provided as mm/dd, adding current year to make the date formatted as mm/dd/yyyy
-            df['IPO Date'] = df['IPO Date'] + f"/{datetime.now().year}"
-            df['IPO Date'] = pd.to_datetime(df['IPO Date'], errors='coerce').dt.date
+            df['ipo_date'] = df['ipo_date'] + f"/{datetime.now().year}"
+            df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
             # at the beginning of the year, the calendar will still show IPOs from last year
             # adding the current year to that previous date will be incorrect
             # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
             # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
-            df.loc[df['IPO Date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'IPO Date'] = df['IPO Date'] - pd.offsets.DateOffset(years=1)
-            df['Market'] = 'Japan Stock Exchange' + ' - ' + df['Symbol'].str.extract(r'\((\w*)\)')
-            df['Symbol'] = df['Symbol'].str.replace(r'(\(\w*\))', '', regex=True)
+            df.loc[df['ipo_date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] - pd.offsets.DateOffset(years=1)
+            df['exchange'] = 'Japan Stock Exchange' + ' - ' + df['ticker'].str.extract(r'\((\w*)\)')
+            df['ticker'] = df['ticker'].str.replace(r'(\(\w*\))', '', regex=True)
             df['time_checked'] = self.time_checked_str
             if df is not None:
                 s_file = os.path.join(self.source_data_folder, 'TokyoIPO.csv')
@@ -185,7 +185,6 @@ class WebDriver:
         except Exception as e:
             logger.error(f"ERROR for TokyoIPO")
             logger.error(e, exc_info=sys.exc_info())
-            logger.info('-' * 100)
             error_screenshot_file = f"TokyoIPO Error {self.time_checked.strftime('%Y-%m-%d %H%M')}.png"
             self.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
             self.webscraping_results.append([self.time_checked_str, 'TokyoIPO', 0])
@@ -197,9 +196,9 @@ class WebDriver:
         try:
             requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
             parameters = {'function': self.config.get('AV', 'funct'),
-                          'apikey': self.config.get('AV', 'funct')}
+                          'apikey': self.config.get('AV', 'key')}
             r = requests.get(self.config.get('AV', 'base_url'), params=parameters, verify=False)
-            cal = [[cell.replace('\r', '') for cell in row.split(',')] for row in r.text.split('\n')]
+            cal = [row.replace('\r', '').split(',') for row in r.text.split('\n')]
             df = pd.DataFrame(cal)
             df.columns = df.loc[0]
             df = df.drop(0).reset_index(drop=True)
