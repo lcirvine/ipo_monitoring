@@ -150,7 +150,7 @@ website_sources = {
             'ticker',
             'company_name',
             'exchange',
-            'shares',
+            'shares_offered',
             'announcement_date',
             'deal_size',
             'cancellation_date'
@@ -613,7 +613,7 @@ website_sources = {
             'company_name',
             'ipo_date',
             'delisting_date',
-            'shares_offered',
+            'shares_outstanding',
             'market_segment'
         ],
         'column_names_as_row': False,
