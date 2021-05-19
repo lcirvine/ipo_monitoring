@@ -7,6 +7,7 @@ config.read('api_key.ini')
 
 website_sources = {
     'NYSE': {
+        'source_type': 'website',
         'exchange': 'NYSE',
         'rank': 1,
         'location': 'New York',
@@ -39,6 +40,7 @@ website_sources = {
         'db_table': 'source_nyse'
     },
     'NYSE Withdrawn': {
+        'source_type': 'website',
         'exchange': 'NYSE',
         'rank': 1,
         'location': 'New York',
@@ -70,6 +72,7 @@ website_sources = {
         'db_table': 'source_nyse_withdrawn'
     },
     'Nasdaq': {
+        'source_type': 'website',
         'exchange': 'NASDAQ',
         'rank': 2,
         'location': 'New York',
@@ -100,6 +103,7 @@ website_sources = {
         'db_table': 'source_nasdaq'
     },
     'Nasdaq Priced': {
+        'source_type': 'website',
         'exchange': 'NASDAQ',
         'rank': 2,
         'location': 'New York',
@@ -131,6 +135,7 @@ website_sources = {
         'db_table': 'source_nasdaq_priced'
     },
     'Nasdaq Withdrawn': {
+        'source_type': 'website',
         'exchange': 'NASDAQ',
         'rank': 2,
         'location': 'New York',
@@ -161,6 +166,7 @@ website_sources = {
         'db_table': 'source_nasdaq_withdrawn'
     },
     'JPX': {
+        'source_type': 'website',
         'exchange': 'Japan Exchange Group',
         'rank': 3,
         'location': 'Tokyo',
@@ -191,6 +197,7 @@ website_sources = {
         'db_table': 'source_jpx'
     },
     'Shanghai': {
+        'source_type': 'website',
         'exchange': 'Shanghai Stock Exchange',
         'rank': 4,
         'location': 'Shanghai',
@@ -225,6 +232,7 @@ website_sources = {
         'db_table': 'source_shanghai'
     },
     'Euronext': {
+        'source_type': 'website',
         'exchange': 'Euronext',
         'rank': 5,
         'location': ', '.join(['Amsterdam', 'Brussels', 'Dublin', 'Lisbon', 'London', 'Oslo', 'Paris']),
@@ -254,6 +262,7 @@ website_sources = {
         'db_table': 'source_euronext'
     },
     'AAStocks': {
+        'source_type': 'website',
         'exchange': 'Hong Kong Exchange',
         'rank': 6,
         'location': 'Hong Kong',
@@ -286,6 +295,7 @@ website_sources = {
         'db_table': 'source_aastocks'
     },
     'LSE': {
+        'source_type': 'website',
         'exchange': 'London Stock Exchange',
         'rank': 7,
         'location': 'London',
@@ -317,6 +327,7 @@ website_sources = {
         'db_table': 'source_lse'
     },
     'CNInfo': {
+        'source_type': 'website',
         'exchange': 'Shenzhen Stock Exchange',
         'rank': 8,
         'location': 'Shenzhen',
@@ -353,6 +364,7 @@ website_sources = {
         'db_table': 'source_cninfo'
     },
     'BS-TSX': {
+        'source_type': 'website',
         'exchange': 'TSX',
         'rank': None,
         'location': 'Toronto',
@@ -379,6 +391,7 @@ website_sources = {
         'db_table': 'source_bs_tsx'
     },
     'BS-TSXV': {
+        'source_type': 'website',
         'exchange': 'TSX',
         'rank': None,
         'location': 'Toronto',
@@ -405,6 +418,7 @@ website_sources = {
         'db_table': 'source_bs_tsxv'
     },
     'TSX': {
+        'source_type': 'website',
         'exchange': 'Toronto Stock Exchange',
         'rank': 9,
         'location': 'Toronto',
@@ -430,6 +444,7 @@ website_sources = {
         'db_table': 'source_tsx'
     },
     'Frankfurt': {
+        'source_type': 'website',
         'exchange': 'Deutsche Boerse',
         'rank': 12,
         'location': 'Frankfurt',
@@ -459,6 +474,7 @@ website_sources = {
         'db_table': 'source_frankfurt'
     },
     'KRX': {
+        'source_type': 'website',
         'exchange': 'Korea Exchange',
         'rank': 13,
         'location': 'Seoul',
@@ -490,6 +506,7 @@ website_sources = {
         'db_table': 'source_krx'
     },
     'TWSE': {
+        'source_type': 'website',
         'exchange': 'Taiwan Stock Exchange',
         'rank': 18,
         'location': 'Taipei',
@@ -524,6 +541,7 @@ website_sources = {
         'db_table': 'source_twse'
     },
     'BME': {
+        'source_type': 'website',
         'exchange': 'BME Spanish Exchanges',
         'rank': 20,
         'location': 'Madrid',
@@ -556,6 +574,7 @@ website_sources = {
         'db_table': 'source_bme'
     },
     'SGX': {
+        'source_type': 'website',
         'exchange': 'Singapore Exchange',
         'rank': 21,
         'location': 'Singapore',
@@ -592,6 +611,7 @@ website_sources = {
         'db_table': 'source_sgx'
     },
     'IDX': {
+        'source_type': 'website',
         'exchange': 'Indonesia Stock Exchange',
         'rank': 24,
         'location': 'Jakarta',
@@ -622,6 +642,7 @@ website_sources = {
         'db_table': 'source_idx'
     },
     'BM': {
+        'source_type': 'website',
         'exchange': 'Bursa Malaysia',
         'rank': 25,
         'location': 'Kuala Lumpur',
@@ -655,6 +676,7 @@ website_sources = {
         'db_table': 'source_bm'
     },
     'BIT': {
+        'source_type': 'website',
         'exchange': 'Borsa Italiana',
         'rank': None,
         'location': 'Milan',
@@ -682,6 +704,7 @@ website_sources = {
         'db_table': 'source_bit'
     },
     'IPOScoop': {
+        'source_type': 'website',
         'exchange': 'NYSE and Nasdaq',
         # 'rank': None
         'location': 'New York',
@@ -715,6 +738,7 @@ website_sources = {
         'db_table': 'source_iposcoop'
     },
     'NasdaqNordic': {
+        'source_type': 'website',
         'exchange': 'Multiple',
         'rank': None,
         'location': ', '.join(['Copenhagen', 'Helsinki', 'Iceland', 'Stockholm']),
@@ -742,35 +766,8 @@ website_sources = {
         'db_table_raw': 'source_nasdaqnordic_raw',
         'db_table': 'source_nasdaqnordic'
     },
-    'Spotlight': {
-        'exchange': 'Spotlight',
-        'rank': None,
-        'location': 'Stockholm',
-        'url': 'https://spotlightstockmarket.com/en/market-overview/listings/',
-        'table_num': 1,
-        'table_elem': 'table',
-        'table_attrs': None,
-        'row_elem': 'tr',
-        # 'row_attrs': {},
-        'cell_elem': 'td',
-        # 'cell_attrs': {},
-        # 'header_elem': None,
-        # 'header_attrs': {},
-        # 'link_elem': '',
-        # 'link_key': '',
-        'columns': [
-            'subscription_period',
-            'ipo_date',
-            'company_name',
-            'listing_type',
-            'document_link'
-        ],
-        'column_names_as_row': False,
-        'file': 'Spotlight',
-        'db_table_raw': 'source_spotlight_raw',
-        'db_table': 'source_spotlight'
-    },
     'East Money': {
+        'source_type': 'website',
         'exchange': ', '.join(['Shanghai Stock Exchange', 'Shenzhen Stock Exchange']),
         'rank': 6,
         'location': ', '.join(['Shanghai', 'Shenzhen']),
@@ -818,8 +815,9 @@ website_sources = {
     }
 }
 
-api_sources = {
+other_sources = {
     'AlphaVantage': {
+        'source_type': 'API',
         'exchange': 'NYSE and Nasdaq',
         'location': 'New York',
         'endpoint': 'https://www.alphavantage.co/query',
@@ -839,6 +837,7 @@ api_sources = {
         'db_table': 'source_alphavantage'
     },
     'SpotlightAPI': {
+        'source_type': 'API',
         'exchange': 'Spotlight',
         'location': 'Stockholm',
         'endpoint': 'http://api.spotlightstockmarket.com/v1/listing',
@@ -853,10 +852,28 @@ api_sources = {
         'file': 'SpotlightAPI',
         'db_table_raw': 'source_spotlight_raw',
         'db_table': 'source_spotlight'
+    },
+    'ASX': {
+        'source_type': 'special_case_website',
+        'exchange': 'Australian Stock Exchange',
+        'location': 'Sydney',
+        'url': 'https://www2.asx.com.au/listings/upcoming-floats-and-listings',
+        'file': 'ASX',
+        'db_table_raw': 'source_asx_raw',
+        'db_table': 'source_asx'
+    },
+    'TokyoIPO': {
+        'source_type': 'special_case_website',
+        'exchange': 'Japan Exchange Group',
+        'location': 'Tokyo',
+        'url': 'http://www.tokyoipo.com/top/iposche/index.php?j_e=E',
+        'file': 'TokyoIPO',
+        'db_table_raw': 'source_tkipo_raw',
+        'db_table': 'source_tkipo'
     }
 }
 
-rejected_sources = {
+unused_sources = {
     'ASX': {
         'exchange': 'Australian Stock Exchange',
         'rank': 16,
@@ -888,34 +905,6 @@ rejected_sources = {
         ],
         'file': 'ASX'
     },
-    'IPOHub': {
-        'exchange': 'Multiple',
-        # 'rank': None,
-        # 'location': None,
-        # 'url': 'https://www.ipohub.io/listings?current-tab=upcoming&view=list&type=ipo&type=listing&take=80',
-        # 'table_num': None,
-        'table_elem': 'div',
-        'table_attrs': {'class': 'latest-offer-table'},
-        'row_elem': 'a',
-        # 'row_attrs': {},
-        'cell_elem': 'div',
-        # 'cell_attrs': {},
-        # 'header_elem': None,
-        # 'header_attrs': {},
-        # 'link_elem': '',
-        # 'link_key': '',
-        'columns': [
-            'Company',
-            'Sector',
-            'Type',
-            'Subscription period',
-            'First Trading Date',
-            'Price',
-            'Pre-money Valuation',
-            'Follow'
-        ],
-        'file': 'IPOHub'
-    },
     'TokyoIPO': {
         'exchange': 'Multiple',
         'rank': 3,
@@ -943,6 +932,63 @@ rejected_sources = {
             'Follow'
         ],
         'file': 'TokyoIPO'
+    },
+    'Spotlight': {
+        'source_type': 'website',
+        'exchange': 'Spotlight',
+        'rank': None,
+        'location': 'Stockholm',
+        'url': 'https://spotlightstockmarket.com/en/market-overview/listings/',
+        'table_num': 1,
+        'table_elem': 'table',
+        'table_attrs': None,
+        'row_elem': 'tr',
+        # 'row_attrs': {},
+        'cell_elem': 'td',
+        # 'cell_attrs': {},
+        # 'header_elem': None,
+        # 'header_attrs': {},
+        # 'link_elem': '',
+        # 'link_key': '',
+        'columns': [
+            'subscription_period',
+            'ipo_date',
+            'company_name',
+            'listing_type',
+            'document_link'
+        ],
+        'column_names_as_row': False,
+        'file': 'Spotlight',
+        'db_table_raw': 'source_spotlight_raw',
+        'db_table': 'source_spotlight'
+    },
+    'IPOHub': {
+        'exchange': 'Multiple',
+        # 'rank': None,
+        # 'location': None,
+        # 'url': 'https://www.ipohub.io/listings?current-tab=upcoming&view=list&type=ipo&type=listing&take=80',
+        # 'table_num': None,
+        'table_elem': 'div',
+        'table_attrs': {'class': 'latest-offer-table'},
+        'row_elem': 'a',
+        # 'row_attrs': {},
+        'cell_elem': 'div',
+        # 'cell_attrs': {},
+        # 'header_elem': None,
+        # 'header_attrs': {},
+        # 'link_elem': '',
+        # 'link_key': '',
+        'columns': [
+            'Company',
+            'Sector',
+            'Type',
+            'Subscription period',
+            'First Trading Date',
+            'Price',
+            'Pre-money Valuation',
+            'Follow'
+        ],
+        'file': 'IPOHub'
     },
     'Nyemissioner': {
         'exchange': 'Multiple',
@@ -1065,19 +1111,19 @@ def return_sources(source_type: str = 'all') -> dict:
     :param source_type: Valid source_types are 'all', 'website' and 'api'. Default source_type is 'all'.
     :return: dictionary of sources
     """
-    valid_types = {'all', 'website', 'api'}
+    valid_types = {'all', 'website', 'other'}
     if source_type not in valid_types:
-        raise ValueError(f"{source_type} is not a valid source type. Please enter all, website or api.")
+        raise ValueError(f"{source_type} is not a valid source type. Please enter all, website or other.")
     if source_type == 'website':
         return website_sources
-    elif source_type == 'api':
-        return api_sources
+    elif source_type == 'other':
+        return other_sources
     elif source_type == 'all':
-        return dict(**website_sources, **api_sources)
+        return dict(**website_sources, **other_sources)
 
 
 def create_source_ref_file(file_name: str = 'sources'):
-    ex_dict = return_sources(source_type='website')
+    ex_dict = return_sources(source_type='all')
     df = pd.DataFrame(ex_dict).transpose()
     if file_name != '':
         df.to_excel(file_name + '.xlsx', index_label='source', freeze_panes=(1, 0))
