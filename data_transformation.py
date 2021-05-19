@@ -51,6 +51,7 @@ class DataTransformation:
             # NYSE provides the expected pricing date, the expected listing date is one day after
             df_up['ipo_date'] = df_up['ipo_date'] + pd.offsets.DateOffset(days=1)
             df_up['shares_offered'] = df_up['shares_offered'].str.replace(',', '').astype(int, errors='ignore')
+            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(int, errors='ignore')
 
             file_name = 'NYSE Withdrawn'
             assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
@@ -110,19 +111,16 @@ class DataTransformation:
             file_name = 'AlphaVantage-US'
             assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
             df = self.src_dfs.get(file_name).copy()
-            # TODO: need to change column names for API sources
-            df = self.format_date_cols(df, ['ipoDate', 'time_checked'])
-            df.loc[(df['priceRangeLow'] != df['priceRangeHigh']) &
-                   (df['priceRangeLow'] != 0), 'price_range'] = df['priceRangeLow'].astype(str) + ' - ' + df['priceRangeHigh'].astype(str)
-            df.loc[(df['priceRangeLow'] == df['priceRangeHigh']) & (df['priceRangeLow'] != 0), 'price'] = df['priceRangeHigh']
+            df = self.format_date_cols(df, ['ipo_date', 'time_checked'])
+            df.loc[(df['price_range_low'] != df['price_range_high']) &
+                   (df['price_range_low'] != 0), 'price_range'] = df['price_range_low'].astype(str) + ' - ' + df['price_range_high'].astype(str)
+            df.loc[(df['price_range_low'] == df['price_range_high']) & (df['price_range_low'] != 0), 'price'] = df['price_range_high']
             # When listing an ETF, warrants or rights both price high and price low will be 0. Those should be dropped.
             # However, direct listings will also have price high and low at 0.
             # TODO: keep only direct listings but drop all other rows where price high and low both equal 0
             # The problem is that when units split into shares and warrants, those will also have 0 as price range
             # and the asset type will still be shares. Those should be dropped as well.
-            df.drop(df.loc[(df['priceRangeLow'] == 0) & (df['priceRangeHigh'] == 0)].index, inplace=True)
-            df.rename(columns={'name': 'company_name', 'symbol': 'ticker', 'ipoDate': 'ipo_date',
-                               'assetType': 'notes'}, inplace=True)
+            df.drop(df.loc[(df['price_range_low'] == 0) & (df['price_range_high'] == 0)].index, inplace=True)
             return df
 
         df_ny = nyse()
