@@ -409,7 +409,7 @@ class DataTransformation:
         self.append_to_all(df)
 
     def spotlight(self):
-        file_name = 'Spotlight'
+        file_name = 'SpotlightAPI'
         assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
         df = self.src_dfs.get(file_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_checked'])
