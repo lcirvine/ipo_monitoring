@@ -15,6 +15,8 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import configparser
 
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
 
 class WebDriver:
     def __init__(self, headless: bool = True):
@@ -111,117 +113,145 @@ class WebDriver:
             df['time_checked'] = self.time_checked_str
             return df
 
-    def asx(self):
-        try:
-            self.driver.get('https://www2.asx.com.au/listings/upcoming-floats-and-listings')
-            soup = self.return_soup()
-            listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
-            df = pd.DataFrame(listing_info)
-            df.columns = ['listing_info']
-            df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
-            df['ipo_date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
-            df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
-            df['exchange'] = 'Australian Stock Exchange'
-            df['time_checked'] = self.time_checked_str
-            if df is not None:
-                s_file = os.path.join(self.source_data_folder, 'ASX.csv')
-                if os.path.exists(s_file):
-                    df = self.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
-                df.sort_values(by='time_checked', ascending=False, inplace=True)
-                df.to_csv(s_file, index=False, encoding='utf-8-sig')
-                self.webscraping_results.append([self.time_checked_str, 'ASX', 1])
-        except Exception as e:
-            logger.error(f"ERROR for ASX")
-            logger.error(e, exc_info=sys.exc_info())
-            error_screenshot_file = f"ASX Error {self.time_checked.strftime('%Y-%m-%d %H%M')}.png"
-            self.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
-            self.webscraping_results.append([self.time_checked_str, 'ASX', 0])
+    def special_cases(self):
 
-    def tkipo(self):
-        try:
-            self.driver.get('http://www.tokyoipo.com/top/iposche/index.php?j_e=E')
-            soup = self.return_soup()
-            table = soup.find('table', attrs={'class': 'iposchedulelist'})
-            table_data = []
-            row = []
-            for r in table.find_all('tr'):
-                for cell in r.find_all('td'):
-                    cell_text = cell.text.strip()
-                    if '\n\n▶\xa0Stock/Chart' in cell_text:
-                        table_data.append(row)
-                        row = [cell_text.replace('\n\n▶\xa0Stock/Chart', '')]
-                    else:
-                        row.append(cell_text)
-            table_data.append(row)
-            df = pd.DataFrame(table_data)
-            df.columns = ['company_name', 'ipo_date', 'ticker', 'shares_outstanding', 'blank_0', 'price_range', 'price',
-                          'bookbuilding_period', 'opening_price', 'percent_change', 'underwriters',
-                          'business_description', 'blank_1']
-            df.replace('', np.nan, inplace=True)
-            df.dropna(how='all', inplace=True)
-            df.drop(columns=['blank_0', 'business_description', 'blank_1'],  inplace=True, errors='ignore')
-            df['company_name'] = df['company_name'].str.strip()
-            df['price_range_expected_date'] = df['price_range'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
-            df['price_expected_date'] = df['price'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
-            df['price'] = pd.to_numeric(df['price'].str.replace(',', ''), errors='coerce')
-            # date is provided as mm/dd, adding current year to make the date formatted as mm/dd/yyyy
-            df['ipo_date'] = df['ipo_date'] + f"/{datetime.now().year}"
-            df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
-            # at the beginning of the year, the calendar will still show IPOs from last year
-            # adding the current year to that previous date will be incorrect
-            # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
-            # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
-            df.loc[df['ipo_date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] - pd.offsets.DateOffset(years=1)
-            df['exchange'] = 'Japan Stock Exchange' + ' - ' + df['ticker'].str.extract(r'\((\w*)\)')
-            df['ticker'] = df['ticker'].str.replace(r'(\(\w*\))', '', regex=True)
-            df['time_checked'] = self.time_checked_str
-            if df is not None:
-                s_file = os.path.join(self.source_data_folder, 'TokyoIPO.csv')
-                if os.path.exists(s_file):
-                    df = self.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
-                df.sort_values(by='time_checked', ascending=False, inplace=True)
-                df.to_csv(s_file, index=False, encoding='utf-8-sig')
-                self.webscraping_results.append([self.time_checked_str, 'TokyoIPO', 1])
-        except Exception as e:
-            logger.error(f"ERROR for TokyoIPO")
-            logger.error(e, exc_info=sys.exc_info())
-            error_screenshot_file = f"TokyoIPO Error {self.time_checked.strftime('%Y-%m-%d %H%M')}.png"
-            self.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
-            self.webscraping_results.append([self.time_checked_str, 'TokyoIPO', 0])
+        def asx():
+            try:
+                self.driver.get('https://www2.asx.com.au/listings/upcoming-floats-and-listings')
+                soup = self.return_soup()
+                listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
+                df = pd.DataFrame(listing_info)
+                df.columns = ['listing_info']
+                df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
+                df['ipo_date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
+                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
+                df['exchange'] = 'Australian Stock Exchange'
+                df['time_checked'] = self.time_checked_str
+                return df
+            except Exception as e:
+                logger.error(f"ERROR for ASX")
+                logger.error(e, exc_info=sys.exc_info())
+
+        def tkipo():
+            try:
+                self.driver.get('http://www.tokyoipo.com/top/iposche/index.php?j_e=E')
+                soup = self.return_soup()
+                table = soup.find('table', attrs={'class': 'iposchedulelist'})
+                table_data = []
+                row = []
+                for r in table.find_all('tr'):
+                    for cell in r.find_all('td'):
+                        cell_text = cell.text.strip()
+                        if '\n\n▶\xa0Stock/Chart' in cell_text:
+                            table_data.append(row)
+                            row = [cell_text.replace('\n\n▶\xa0Stock/Chart', '')]
+                        else:
+                            row.append(cell_text)
+                table_data.append(row)
+                df = pd.DataFrame(table_data)
+                df.columns = ['company_name', 'ipo_date', 'ticker', 'shares_outstanding', 'blank_0', 'price_range',
+                              'price', 'bookbuilding_period', 'opening_price', 'percent_change', 'underwriters',
+                              'business_description', 'blank_1']
+                df.replace('', np.nan, inplace=True)
+                df.dropna(how='all', inplace=True)
+                df.drop(columns=['blank_0', 'business_description', 'blank_1'],  inplace=True, errors='ignore')
+                df['company_name'] = df['company_name'].str.strip()
+                df['price_range_expected_date'] = df['price_range'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
+                df['price_expected_date'] = df['price'].str.extract(r'^(\d{0,2}\/\d{0,2})$')
+                df['price'] = pd.to_numeric(df['price'].str.replace(',', ''), errors='coerce')
+                # date is provided as mm/dd, adding current year to make the date formatted as mm/dd/yyyy
+                df['ipo_date'] = df['ipo_date'] + f"/{datetime.now().year}"
+                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
+                # at the beginning of the year, the calendar will still show IPOs from last year
+                # adding the current year to that previous date will be incorrect
+                # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
+                # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
+                df.loc[df['ipo_date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] - pd.offsets.DateOffset(years=1)
+                df['exchange'] = 'Japan Stock Exchange' + ' - ' + df['ticker'].str.extract(r'\((\w*)\)')
+                df['ticker'] = df['ticker'].str.replace(r'(\(\w*\))', '', regex=True)
+                df['time_checked'] = self.time_checked_str
+                return df
+            except Exception as e:
+                logger.error(f"ERROR for TokyoIPO")
+                logger.error(e, exc_info=sys.exc_info())
+
+        def av_api():
+            try:
+                parameters = {'function': self.config.get('AV', 'funct'),
+                              'apikey': self.config.get('AV', 'key')}
+                r = requests.get(self.config.get('AV', 'base_url'), params=parameters, verify=False)
+                if r.ok:
+                    cal = [row.replace('\r', '').split(',') for row in r.text.split('\n')]
+                    df = pd.DataFrame(cal)
+                    df.columns = df.loc[0]
+                    df = df.drop(0).reset_index(drop=True)
+                    df = df.dropna()
+                    df.loc[df['name'].str.contains(r' Warrant'), 'assetType'] = 'Warrants'
+                    df.loc[df['name'].str.contains(r' Right'), 'assetType'] = 'Rights'
+                    df.loc[df['name'].str.contains(r' Unit'), 'assetType'] = 'Units'
+                    df['assetType'].fillna('Shares', inplace=True)
+                    for c in ['priceRangeLow', 'priceRangeHigh']:
+                        df[c] = pd.to_numeric(df[c], errors='coerce')
+                    df['time_checked'] = self.time_checked_str
+                    df.sort_values(by=['ipoDate', 'name'], inplace=True)
+                    df.rename(columns={
+                        'symbol': 'ticker',
+                        'name': 'company_name',
+                        'ipoDate': 'ipo_date',
+                        'priceRangeLow': 'price_range_low',
+                        'priceRangeHigh': 'price_range_high'}, inplace=True)
+                    return df
+            except Exception as e:
+                logger.error(f"ERROR for AlphaVantage")
+                logger.error(e, exc_info=sys.exc_info())
+
+        def spotlight_api():
+            try:
+                res = requests.get('http://api.spotlightstockmarket.com/v1/listing')
+                if res.ok:
+                    rj = json.loads(res.text)
+                    df = pd.json_normalize(rj)
+                    # this api returns all IPOs so cutting it down to only IPOs since 2020
+                    df = df.loc[df['ListingDate'] >= '2020-01-01']
+                    # dropping additional documents columns, keeping 'Documents'
+                    df.drop(columns=['ExternalDocuments', 'CompanyDocuments'], inplace=True)
+                    df.rename(columns={
+                        'Id': 'num',
+                        'DateFrom': 'subscription_date_start',
+                        'DateTo': 'subscription_date_end',
+                        'ListingDate': 'ipo_date',
+                        'CompanyName': 'company_name',
+                        'EmissionDescriptionEnglish': 'listing_type'}, inplace=True)
+                    df['time_checked'] = self.time_checked_str
+                    return df
+            except Exception as e:
+                logger.error(f"ERROR for SpotlightAPI")
+                logger.error(e, exc_info=sys.exc_info())
+
+        special_case_dict = {
+            'ASX': {'df': asx(), 'file': 'ASX', 'db_table_raw': 'source_asx_raw'},
+            'TokyoIPO': {'df': tkipo(), 'file': 'TokyoIPO', 'db_table_raw': 'source_tkipo_raw'},
+            'AlphaVantage': {'df': av_api(), 'file': 'AlphaVantage-US', 'db_table_raw': 'source_alphavantage_raw'},
+            'SpotlightAPI': {'df': spotlight_api(), 'file': 'SpotlightAPI', 'db_table_raw': 'source_spotlight_raw'}
+        }
+
+        for src, details in special_case_dict.items():
+            try:
+                if details['df'] is not None:
+                    df = details['df']
+                    s_file = os.path.join(self.source_data_folder, details['file'] + '.csv')
+                    if os.path.exists(s_file):
+                        df = self.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
+                    df.sort_values(by='time_checked', ascending=False, inplace=True)
+                    df.to_csv(s_file, index=False, encoding='utf-8-sig')
+                    self.webscraping_results.append([self.time_checked_str, src, 1])
+                else:
+                    self.webscraping_results.append([self.time_checked_str, src, 0])
+            except Exception as e:
+                logger.error(e, exc_info=sys.exc_info())
 
     def close_driver(self):
         self.driver.close()
-
-    def av_api(self):
-        try:
-            requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-            parameters = {'function': self.config.get('AV', 'funct'),
-                          'apikey': self.config.get('AV', 'key')}
-            r = requests.get(self.config.get('AV', 'base_url'), params=parameters, verify=False)
-            cal = [row.replace('\r', '').split(',') for row in r.text.split('\n')]
-            df = pd.DataFrame(cal)
-            df.columns = df.loc[0]
-            df = df.drop(0).reset_index(drop=True)
-            df = df.dropna()
-            df.loc[df['name'].str.contains(r' Warrant'), 'assetType'] = 'Warrants'
-            df.loc[df['name'].str.contains(r' Right'), 'assetType'] = 'Rights'
-            df.loc[df['name'].str.contains(r' Unit'), 'assetType'] = 'Units'
-            df['assetType'].fillna('Shares', inplace=True)
-            for c in ['priceRangeLow', 'priceRangeHigh']:
-                df[c] = pd.to_numeric(df[c], errors='coerce')
-            df['time_checked'] = self.time_checked_str
-            df.sort_values(by=['ipoDate', 'name'], inplace=True)
-            s_file = os.path.join(self.source_data_folder, self.config.get('AV', 'file_name') + '.csv')
-            if os.path.exists(s_file):
-                df = self.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
-            df.sort_values(by='time_checked', ascending=False, inplace=True)
-            df.to_csv(s_file, index=False, encoding='utf-8-sig')
-            self.webscraping_results.append([self.time_checked_str, self.config.get('AV', 'file_name'), 1])
-        except Exception as e:
-            logger.error(f"ERROR for AV")
-            logger.error(e, exc_info=sys.exc_info())
-            logger.info('-' * 100)
-            self.webscraping_results.append([self.time_checked_str, 'AV', 0])
 
     @staticmethod
     def update_existing_data(old_df: pd.DataFrame, new_df: pd.DataFrame, exclude_col=None) -> pd.DataFrame:
@@ -287,15 +317,12 @@ def main():
         except Exception as e:
             logger.error(f"ERROR for {k}")
             logger.error(e, exc_info=sys.exc_info())
-            logger.info('-' * 100)
             error_screenshot_file = f"{k} Error {wd.time_checked.strftime('%Y-%m-%d %H%M')}.png"
             wd.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
             wd.webscraping_results.append([wd.time_checked_str, k, 0])
             pass
-    wd.asx()
-    wd.tkipo()
+    wd.special_cases()
     wd.close_driver()
-    wd.av_api()
     wd.save_webscraping_results()
 
 
