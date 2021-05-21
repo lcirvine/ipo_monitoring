@@ -215,6 +215,10 @@ class WebDriver:
                     df = df.loc[df['ListingDate'] >= '2020-01-01']
                     # dropping additional documents columns, keeping 'Documents'
                     df.drop(columns=['ExternalDocuments', 'CompanyDocuments'], inplace=True)
+                    # Documents is a list (it comes from json) which will throw an error when I try to drop duplicates
+                    # TypeError: unhashable type: 'list'
+                    # converting Documents to string to avoid that error
+                    df['Documents'] = df['Documents'].astype(str)
                     df.rename(columns={
                         'Id': 'num',
                         'DateFrom': 'subscription_date_start',
