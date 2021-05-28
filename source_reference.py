@@ -1099,11 +1099,6 @@ unused_sources = {
 }
 
 
-def create_json_file(file_name: str = 'sources'):
-    with open(file_name + '.json', 'w') as f:
-        json.dump(website_sources, f)
-
-
 def return_sources(source_type: str = 'all') -> dict:
     """
     Returns a dictionary sources specified by the source_type.
@@ -1120,6 +1115,11 @@ def return_sources(source_type: str = 'all') -> dict:
         return other_sources
     elif source_type == 'all':
         return dict(**website_sources, **other_sources)
+
+
+def create_json_file(file_name: str = 'sources', source_type: str = 'all'):
+    with open(file_name + '.json', 'w') as f:
+        json.dump(return_sources(source_type), f)
 
 
 def create_source_ref_file(file_name: str = 'sources'):
