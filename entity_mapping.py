@@ -45,7 +45,7 @@ class EntityMatchBulk:
         df['client_id'] = df['Company Name'].fillna('') + '_' + df['Symbol'].fillna('').astype(str) + '_' + df['Market'].fillna('')
         df.set_index('client_id', inplace=True)
         # save that dataframe to a csv encoded as utf8
-        if len(df) > 1:
+        if len(df) >= 1:
             df.to_csv(self.file, index_label='client_id', encoding='utf-8-sig')
 
     def entity_mapping_api(self):
