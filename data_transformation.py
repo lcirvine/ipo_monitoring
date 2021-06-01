@@ -108,7 +108,7 @@ class DataTransformation:
             return df
 
         def av():
-            file_name = 'AlphaVantage-US'
+            file_name = 'AlphaVantage'
             assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
             df = self.src_dfs.get(file_name).copy()
             df = self.format_date_cols(df, ['ipo_date', 'time_checked'])
