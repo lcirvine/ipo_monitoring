@@ -14,6 +14,8 @@ import numpy as np
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import configparser
+from pg_connection import pg_connection
+from sqlalchemy import types as sql_types
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -33,10 +35,12 @@ class WebDriver:
         sources_file = os.path.join(os.getcwd(), 'sources.json')
         if os.path.exists(sources_file):
             with open(sources_file, 'r') as f:
-                self.sources_dict = json.load(f)
+                self.sources = json.load(f)
+            self.website_sources = {k: v for k, v in self.sources.items() if v['source_type'] == 'website'}
         self.webscraping_results = []
         self.config = configparser.ConfigParser()
         self.config.read('api_key.ini')
+        self.conn = pg_connection()
 
     @staticmethod
     def random_wait():
@@ -117,7 +121,8 @@ class WebDriver:
 
         def asx():
             try:
-                self.driver.get('https://www2.asx.com.au/listings/upcoming-floats-and-listings')
+                url = self.sources['ASX'].get('url')
+                self.driver.get(url)
                 soup = self.return_soup()
                 listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
                 df = pd.DataFrame(listing_info)
@@ -134,7 +139,8 @@ class WebDriver:
 
         def tkipo():
             try:
-                self.driver.get('http://www.tokyoipo.com/top/iposche/index.php?j_e=E')
+                url = self.sources['TokyoIPO'].get('url')
+                self.driver.get(url)
                 soup = self.return_soup()
                 table = soup.find('table', attrs={'class': 'iposchedulelist'})
                 table_data = []
@@ -164,7 +170,7 @@ class WebDriver:
                 df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
                 # at the beginning of the year, the calendar will still show IPOs from last year
                 # adding the current year to that previous date will be incorrect
-                # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
+                # those incorrect dates will be 6+ months away, shouldn't see legitimate IPO dates that far in advance
                 # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
                 df.loc[df['ipo_date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] - pd.offsets.DateOffset(years=1)
                 df['exchange'] = 'Japan Stock Exchange' + ' - ' + df['ticker'].str.extract(r'\((\w*)\)')
@@ -177,9 +183,9 @@ class WebDriver:
 
         def av_api():
             try:
-                parameters = {'function': self.config.get('AV', 'funct'),
-                              'apikey': self.config.get('AV', 'key')}
-                r = requests.get(self.config.get('AV', 'base_url'), params=parameters, verify=False)
+                parameters = self.sources['AlphaVantage'].get('parameters')
+                endpoint = self.sources['AlphaVantage'].get('endpoint')
+                r = requests.get(endpoint, params=parameters, verify=False)
                 if r.ok:
                     cal = [row.replace('\r', '').split(',') for row in r.text.split('\n')]
                     df = pd.DataFrame(cal)
@@ -207,7 +213,8 @@ class WebDriver:
 
         def spotlight_api():
             try:
-                res = requests.get('http://api.spotlightstockmarket.com/v1/listing')
+                endpoint = self.sources['SpotlightAPI'].get('endpoint')
+                res = requests.get(endpoint)
                 if res.ok:
                     rj = json.loads(res.text)
                     df = pd.json_normalize(rj)
@@ -233,29 +240,26 @@ class WebDriver:
                 logger.error(e, exc_info=sys.exc_info())
 
         special_case_dict = {
-            'ASX': {'df': asx(), 'file': 'ASX', 'db_table_raw': 'source_asx_raw'},
-            'TokyoIPO': {'df': tkipo(), 'file': 'TokyoIPO', 'db_table_raw': 'source_tkipo_raw'},
-            'AlphaVantage': {'df': av_api(), 'file': 'AlphaVantage-US', 'db_table_raw': 'source_alphavantage_raw'},
-            'SpotlightAPI': {'df': spotlight_api(), 'file': 'SpotlightAPI', 'db_table_raw': 'source_spotlight_raw'}
+            'ASX': asx(),
+            'TokyoIPO': tkipo(),
+            'AlphaVantage': av_api(),
+            'SpotlightAPI': spotlight_api()
         }
 
-        for src, details in special_case_dict.items():
+        for src, df in special_case_dict.items():
             try:
-                if details['df'] is not None:
-                    df = details['df']
-                    s_file = os.path.join(self.source_data_folder, details['file'] + '.csv')
+                if df is not None:
+                    s_file = os.path.join(self.source_data_folder, self.sources[src].get('file') + '.csv')
                     if os.path.exists(s_file):
                         df = self.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
                     df.sort_values(by='time_checked', ascending=False, inplace=True)
                     df.to_csv(s_file, index=False, encoding='utf-8-sig')
+                    self.update_table(df, self.sources[src].get('db_table_raw'))
                     self.webscraping_results.append([self.time_checked_str, src, 1])
                 else:
                     self.webscraping_results.append([self.time_checked_str, src, 0])
             except Exception as e:
                 logger.error(e, exc_info=sys.exc_info())
-
-    def close_driver(self):
-        self.driver.close()
 
     @staticmethod
     def update_existing_data(old_df: pd.DataFrame, new_df: pd.DataFrame, exclude_col=None) -> pd.DataFrame:
@@ -287,9 +291,42 @@ class WebDriver:
         # I want to preserve when this item was first added to the website and have most recent updates at the top so
         # sorting by most recent time_checked, dropping duplicates for subset of columns and keeping the last (earliest)
         if 'time_checked' in df.columns:
+            df['time_checked'] = pd.to_datetime(df['time_checked'], errors='coerce')
             df.sort_values(by='time_checked', ascending=False, inplace=True)
         df.drop_duplicates(subset=ss, keep='last', inplace=True)
         return df
+
+    def update_table(self, df_new: pd.DataFrame, source_table: str):
+        df = df_new.copy()
+        try:
+            df_s = pd.read_sql_table(source_table, self.conn)
+            for col in ['ipo_date', 'time_checked']:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col].fillna(pd.NaT), errors='coerce')
+            for col in df.columns:
+                if col in df_s.columns:
+                    df[col] = df[col].astype(df_s[col].dtype.name)
+            merge_cols = [c for c in df.columns if c != 'time_checked']
+            df_m = pd.merge(df_s, df, how='outer', on=merge_cols, suffixes=('', '_'), indicator=True)
+            df_m['time_added'].fillna(df_m['time_checked'], inplace=True)
+            df_m.loc[
+                (df_m['_merge'] == 'left_only')
+                & (df_m['time_removed'].isna()), 'time_removed'] = self.time_checked_str
+            df_m.drop(columns=['_merge', 'time_checked'], inplace=True)
+        except ValueError:
+            # if the table doesn't exist in the db, it will throw a value error
+            df_m = df.rename(columns={'time_checked': 'time_added'})
+            df_m['time_removed'] = pd.NaT
+        for col in ['ipo_date', 'time_added', 'time_removed']:
+            if col in df_m.columns:
+                df_m[col] = pd.to_datetime(df_m[col].fillna(pd.NaT), errors='coerce')
+        df_m.sort_values(by='time_added', inplace=True)
+        df_m.to_sql(source_table, self.conn, if_exists='replace', index=False, dtype={
+            'ipo_date': sql_types.Date,
+            'time_added': sql_types.DateTime,
+            'time_removed': sql_types.DateTime
+        })
+        logger.info(f"Table {source_table} updated")
 
     def save_webscraping_results(self):
         """
@@ -302,16 +339,21 @@ class WebDriver:
             for r in self.webscraping_results:
                 writer.writerow(r)
 
+    def close_down(self):
+        self.driver.close()
+        self.conn.close()
+
 
 def main():
     wd = WebDriver()
     wd.random_wait()
     logger.info("Gathering data from sources")
-    for k, v in wd.sources_dict.items():
+    for k, v in wd.website_sources.items():
         try:
             wd.load_url(v.get('url'), sleep_after=True)
             df = wd.parse_table(**v)
             if df is not None:
+                wd.update_table(df, v.get('db_table_raw'))
                 s_file = os.path.join(wd.source_data_folder, v.get('file') + '.csv')
                 if os.path.exists(s_file):
                     df = wd.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
@@ -326,8 +368,8 @@ def main():
             wd.webscraping_results.append([wd.time_checked_str, k, 0])
             pass
     wd.special_cases()
-    wd.close_driver()
     wd.save_webscraping_results()
+    wd.close_down()
 
 
 if __name__ == '__main__':
