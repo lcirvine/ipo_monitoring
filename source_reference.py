@@ -832,7 +832,7 @@ other_sources = {
             'priceRangeLow': 'price_range_low',
             'priceRangeHigh': 'price_range_high'
         },
-        'file': 'AlphaVantage-US',
+        'file': 'AlphaVantage',
         'db_table_raw': 'source_alphavantage_raw',
         'db_table': 'source_alphavantage'
     },
