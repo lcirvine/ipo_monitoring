@@ -440,6 +440,8 @@ class DataTransformation:
         self.df_all.drop_duplicates(subset=['company_name', 'exchange'], inplace=True)
         self.df_all.sort_values(by=['ipo_date', 'time_checked'], ascending=False, inplace=True)
         self.df_all.reset_index(drop=True, inplace=True)
+
+    def save_all(self):
         # TODO: keep db friendly names once ready to save other files to db
         # renaming back to original names for now
         self.df_all.rename(columns={
@@ -452,8 +454,6 @@ class DataTransformation:
             'status': 'Status',
             'notes': 'Notes'
         }, inplace=True)
-
-    def save_all(self):
         self.df_all.to_excel(self.result_file, sheet_name='All IPOs', index=False, encoding='utf-8-sig',
                              freeze_panes=(1, 0))
 
