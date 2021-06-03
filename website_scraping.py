@@ -43,8 +43,8 @@ class WebDriver:
         self.conn = pg_connection()
 
     @staticmethod
-    def random_wait():
-        wait_time = randint(0, 300)
+    def random_wait(max_wait_sec: int = 120):
+        wait_time = randint(0, max_wait_sec)
         time.sleep(wait_time)
 
     def load_url(self, url: str, sleep_after: bool = False):
@@ -300,7 +300,7 @@ class WebDriver:
         df = df_new.copy()
         try:
             df_s = pd.read_sql_table(source_table, self.conn)
-            for col in ['ipo_date', 'time_checked']:
+            for col in ['time_checked']:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col].fillna(pd.NaT), errors='coerce')
             for col in df.columns:
@@ -317,16 +317,15 @@ class WebDriver:
             # if the table doesn't exist in the db, it will throw a value error
             df_m = df.rename(columns={'time_checked': 'time_added'})
             df_m['time_removed'] = pd.NaT
-        for col in ['ipo_date', 'time_added', 'time_removed']:
+        for col in ['time_added', 'time_removed']:
             if col in df_m.columns:
                 df_m[col] = pd.to_datetime(df_m[col].fillna(pd.NaT), errors='coerce')
         df_m.sort_values(by='time_added', inplace=True)
         df_m.to_sql(source_table, self.conn, if_exists='replace', index=False, dtype={
-            'ipo_date': sql_types.Date,
             'time_added': sql_types.DateTime,
             'time_removed': sql_types.DateTime
         })
-        logger.info(f"Table {source_table} updated")
+        # logger.info(f"Table {source_table} updated")
 
     def save_webscraping_results(self):
         """
