@@ -1,8 +1,7 @@
 import json
 import pandas as pd
 import configparser
-from pg_connection import pg_connection
-from sqlalchemy import types as sql_types
+from pg_connection import pg_connection, sql_types
 from logging_ipo_dates import logger
 import sys
 
@@ -1153,7 +1152,7 @@ def create_source_ref_file(file_name: str = 'sources'):
 
 def main():
     create_json_file()
-    create_source_ref_file()
+    # create_source_ref_file()
 
 
 if __name__ == '__main__':
