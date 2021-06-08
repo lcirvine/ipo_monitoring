@@ -8,6 +8,7 @@ from time import sleep
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from configparser import ConfigParser
+from pg_connection import pg_connection, rc
 from logging_ipo_dates import logger, error_email, log_folder
 
 pd.options.mode.chained_assignment = None
@@ -142,6 +143,14 @@ class EntityMatchBulk:
         df.sort_values(by=['entityName', 'Company Name'], inplace=True)
         df.drop_duplicates(subset=['Company Name'], inplace=True)
         df.to_excel(self.entity_mapping_file, index=False, encoding='utf-8-sig')
+        conn = pg_connection()
+        try:
+            df.columns = [rc.sub('', col).lower().replace(' ', '_') for col in df.columns]
+            df.to_sql('entity_mapping', conn, if_exists='replace', index=False)
+        except Exception as e:
+            logger.error(e, exc_info=sys.exc_info())
+        finally:
+            conn.close()
 
     @staticmethod
     def iconum_to_entity_id(iconum: int):
@@ -171,11 +180,10 @@ def main():
     logger.info("Checking Cordance API for entity IDs")
     em = EntityMatchBulk()
     try:
-        em.create_csv()
+        em.create_csv(recheck_all=True)
         em.entity_mapping_api()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
-        logger.info('-' * 100)
         error_email(str(e))
 
 
