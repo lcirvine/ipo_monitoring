@@ -6,6 +6,7 @@ import numpy as np
 from datetime import date
 from configparser import ConfigParser
 from logging_ipo_dates import logger, error_email
+from pg_connection import pg_connection, rc, sql_types
 
 pd.options.mode.chained_assignment = None
 
@@ -19,6 +20,7 @@ class DataComparison:
         self.df_pp = self.pipe_data()
         self.df_e = self.entity_data()
         self.df_s = self.source_data()
+        self.conn = pg_connection()
 
     def return_db_connection(self, db_name: str):
         return pyodbc.connect(
@@ -32,6 +34,7 @@ class DataComparison:
         df = pd.read_sql_query(self.config.get('query', 'peopipe'), self.return_db_connection('termcond'))
         df.drop_duplicates(inplace=True)
         pp_file = os.path.join(self.ref_folder, 'PEO-PIPE IPO Data.xlsx')
+        # TODO: read from sql table rather than file
         if os.path.exists(pp_file):
             df = pd.concat([pd.read_excel(pp_file, dtype={'CUSIP': str}), df], ignore_index=True, sort=False)
         df['exchange'] = df['exchange'].str.strip()
@@ -42,6 +45,12 @@ class DataComparison:
         df.drop_duplicates(subset=['iconum', 'master_deal', 'ticker'], inplace=True)
         df['ticker'] = df['ticker'].replace(['nan', 'None'], np.nan)
         df.to_excel(pp_file, index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
+        try:
+            df_sql = df.copy()
+            df_sql.columns = [rc.sub('', col).lower().replace(' ', '_') for col in df_sql.columns]
+            df_sql.to_sql('peo_pipe', self.conn, if_exists='replace', index=False)
+        except Exception as e:
+            logger.error(e, exc_info=sys.exc_info())
         return df
 
     def entity_data(self):
@@ -152,7 +161,16 @@ class DataComparison:
             self.df_s.to_excel(writer, sheet_name='Upcoming IPOs - External', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             self.df_pp.to_excel(writer, sheet_name='PEO-PIPE IPO Data', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
             df_summary.to_excel(writer, sheet_name='Summary', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
+        try:
+            df_sql = df_m.copy()
+            df_sql.columns = [rc.sub('', col).lower().replace(' ', '_') for col in df_sql.columns]
+            df_sql.to_sql('comparison', self.conn, if_exists='replace', index=False)
+        except Exception as e:
+            logger.error(e, exc_info=sys.exc_info())
         return df_summary
+
+    def close_connection(self):
+        self.conn.close()
 
 
 def main():
@@ -165,6 +183,8 @@ def main():
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))
+    finally:
+        dc.close_connection()
 
 
 if __name__ == '__main__':
