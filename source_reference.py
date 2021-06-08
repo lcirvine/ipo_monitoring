@@ -1,6 +1,10 @@
 import json
 import pandas as pd
 import configparser
+from pg_connection import pg_connection
+from sqlalchemy import types as sql_types
+from logging_ipo_dates import logger
+import sys
 
 config = configparser.ConfigParser()
 config.read('api_key.ini')
@@ -1126,8 +1130,25 @@ def create_source_ref_file(file_name: str = 'sources'):
     ex_dict = return_sources(source_type='all')
     df = pd.DataFrame(ex_dict).transpose()
     if file_name != '':
-        df.to_excel(file_name + '.xlsx', index_label='source', freeze_panes=(1, 0))
         df.to_csv(file_name + '.csv', index_label='source')
+        conn = pg_connection()
+        try:
+            df_col_ref = df[['columns']].explode('columns').reset_index()
+            df_col_ref.rename(columns={'index': 'source_name', 'columns': 'col_name'}, inplace=True)
+            df_col_ref['col_num'] = df_col_ref.groupby(['source_name']).cumcount() + 1
+            df_col_ref.to_sql('ref_columns', conn, if_exists='replace', index=False)
+            df.drop(columns=['columns'], inplace=True)
+            for i, row in df.iterrows():
+                icell = row['cell_elem']
+                if type(icell) == list:
+                    df.loc[i, 'cell_elem'] = ', '.join(icell)
+            dict_cols = ['table_attrs', 'header_attrs', 'parameters', 'rename_columns']
+            dtype_mapping = {dc: sql_types.JSON for dc in dict_cols}
+            df.to_sql('ref_sources', conn, if_exists='replace', index_label='source_name', dtype=dtype_mapping)
+        except Exception as e:
+            logger.error(e, exc_info=sys.exc_info())
+        finally:
+            conn.close()
 
 
 def main():
