@@ -1125,7 +1125,7 @@ def create_json_file(file_name: str = 'sources', source_type: str = 'all'):
         json.dump(return_sources(source_type), f)
 
 
-def create_source_ref_file(file_name: str = 'sources'):
+def create_source_ref(file_name: str = 'sources'):
     ex_dict = return_sources(source_type='all')
     df = pd.DataFrame(ex_dict).transpose()
     if file_name != '':
@@ -1150,9 +1150,10 @@ def create_source_ref_file(file_name: str = 'sources'):
             conn.close()
 
 
-def main():
+def main(create_ref: bool = False):
     create_json_file()
-    # create_source_ref_file()
+    if create_ref:
+        create_source_ref()
 
 
 if __name__ == '__main__':
