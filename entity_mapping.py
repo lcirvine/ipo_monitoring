@@ -8,7 +8,7 @@ from time import sleep
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from configparser import ConfigParser
-from pg_connection import pg_connection, rc
+from pg_connection import pg_connection, convert_cols_db
 from logging_ipo_dates import logger, error_email, log_folder
 
 pd.options.mode.chained_assignment = None
@@ -138,6 +138,7 @@ class EntityMatchBulk:
         df.loc[df['confidenceScore'] <= .75, 'mapStatus'] = 'UNMAPPED'
         df.loc[df['confidenceScore'] <= .75, ['entityName', 'iconum', 'entity_id', 'similarityScore', 'confidenceScore',
                                               'countryName', 'entityTypeCode', 'entityTypeDescription']] = np.nan
+        # TODO: read from db table rather than file
         if os.path.exists(self.entity_mapping_file):
             df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)
         df.sort_values(by=['entityName', 'Company Name'], inplace=True)
@@ -145,7 +146,7 @@ class EntityMatchBulk:
         df.to_excel(self.entity_mapping_file, index=False, encoding='utf-8-sig')
         conn = pg_connection()
         try:
-            df.columns = [rc.sub('', col).lower().replace(' ', '_') for col in df.columns]
+            df.columns = convert_cols_db(df.columns)
             df.to_sql('entity_mapping', conn, if_exists='replace', index=False)
         except Exception as e:
             logger.error(e, exc_info=sys.exc_info())
