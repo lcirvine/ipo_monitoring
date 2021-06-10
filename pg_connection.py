@@ -2,10 +2,15 @@ import os
 import re
 import configparser
 from sqlalchemy import create_engine
+from typing import Union
+from pandas.core.indexes.base import Index
 from sqlalchemy import types as sql_types
 # import psycopg2
 
-rc = re.compile(r'([\(\)\?\+]*)')
+
+def convert_cols_db(col_list: Union[list, Index]) -> list:
+    rc = re.compile(r'([\(\)\?\+]*)')
+    return [rc.sub('', col).lower().replace(' ', '_') for col in col_list]
 
 
 def pg_connection():
