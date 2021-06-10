@@ -6,7 +6,7 @@ import numpy as np
 from datetime import date
 from configparser import ConfigParser
 from logging_ipo_dates import logger, error_email
-from pg_connection import pg_connection, rc, sql_types
+from pg_connection import pg_connection, convert_cols_db, sql_types
 
 pd.options.mode.chained_assignment = None
 
@@ -17,10 +17,10 @@ class DataComparison:
         self.config.read('db_connection.ini')
         self.results_folder = os.path.join(os.getcwd(), 'Results')
         self.ref_folder = os.path.join(os.getcwd(), 'Reference')
+        self.conn = pg_connection()
         self.df_pp = self.pipe_data()
         self.df_e = self.entity_data()
         self.df_s = self.source_data()
-        self.conn = pg_connection()
 
     def return_db_connection(self, db_name: str):
         return pyodbc.connect(
@@ -47,7 +47,7 @@ class DataComparison:
         df.to_excel(pp_file, index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
         try:
             df_sql = df.copy()
-            df_sql.columns = [rc.sub('', col).lower().replace(' ', '_') for col in df_sql.columns]
+            df_sql.columns = convert_cols_db(df_sql.columns)
             df_sql.to_sql('peo_pipe', self.conn, if_exists='replace', index=False)
         except Exception as e:
             logger.error(e, exc_info=sys.exc_info())
@@ -163,7 +163,7 @@ class DataComparison:
             df_summary.to_excel(writer, sheet_name='Summary', index=False, encoding='utf-8-sig', freeze_panes=(1, 0))
         try:
             df_sql = df_m.copy()
-            df_sql.columns = [rc.sub('', col).lower().replace(' ', '_') for col in df_sql.columns]
+            df_sql.columns = convert_cols_db(df_sql.columns)
             df_sql.to_sql('comparison', self.conn, if_exists='replace', index=False)
         except Exception as e:
             logger.error(e, exc_info=sys.exc_info())
