@@ -4,6 +4,7 @@ from datetime import date
 import configparser
 import pandas as pd
 import win32com.client as win32
+from pg_connection import pg_connection, convert_cols_db
 
 
 log_file = 'IPO Monitoring Logs.txt'
@@ -62,6 +63,19 @@ def consolidate_webscraping_results(num_recent: int = 30):
     df_recent = df_recent.merge(failures, how='left', on='source')
     df_recent = df_recent.merge(successes, how='left', on='source')
     df_recent.to_csv(os.path.join(log_folder, 'Recent Webscraping Performance.csv'), index=False, encoding='utf-8-sig')
+    conn = pg_connection()
+    try:
+        df_all = pd.read_csv(os.path.join('Logs', 'Webscraping Results.csv'))
+        df_all.columns = convert_cols_db(df_all.columns)
+        df_all.to_sql('webscraping_results', conn, if_exists='replace', index=False)
+
+        df = pd.read_csv(os.path.join('Logs', 'Recent Webscraping Performance.csv'))
+        df.columns = convert_cols_db(df.columns)
+        df.to_sql('webscraping_results_recent', conn, if_exists='replace', index=False)
+    except Exception as e:
+        logger.error(e)
+    finally:
+        conn.close()
 
 
 if __name__ == '__main__':
