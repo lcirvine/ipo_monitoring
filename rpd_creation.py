@@ -8,6 +8,7 @@ from requests_ntlm import HttpNtlmAuth
 import json
 from time import sleep
 from collections import defaultdict
+from pg_connection import pg_connection, convert_cols_db
 from logging_ipo_dates import logger, error_email
 
 pd.options.mode.chained_assignment = None
@@ -125,9 +126,10 @@ class RPDCreation:
         :return:
         """
         df_wd = pd.merge(self.df_wd, self.df_rpd, how='inner', on='formatted company name', suffixes=('', '_'))
+        df_wd = df_wd.loc[df_wd['RPD Status'] != 'Resolved']
         if len(df_wd) > 0:
             df_wd['IPO Date'] = df_wd['IPO Date'].dt.strftime('%Y-%m-%d')
-            logger.info(f"{len(df_wd)} RPDs to update for withdrwan IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
+            logger.info(f"{len(df_wd)} RPDs to update for withdrawn IPOs: {', '.join([str(int(num)) for num in df_wd['RPD Number'].to_list()])}")
             df_wd.replace(np.nan, '', inplace=True)
             for idx, row in df_wd.iterrows():
                 rpd = int(row['RPD Number'])
@@ -328,6 +330,14 @@ class RPDCreation:
                            'RPD Creation Date',
                            'RPD Status']]
         self.df.to_excel(self.result_file, index=False, encoding='utf-8-sig')
+        conn = pg_connection()
+        try:
+            self.df.columns = convert_cols_db(self.df.columns)
+            self.df.to_sql('rpd_ipo_monitoring', conn, if_exists='replace', index=False)
+        except Exception as e:
+            logger.error(e)
+        finally:
+            conn.close()
 
 
 def resolve_rpds():
