@@ -172,7 +172,7 @@ class DataTransformation:
         df_tk.loc[df_tk['price_range_expected_date'].notna(), 'notes'] = 'Price Range expected ' + df_tk['price_range_expected_date'].astype(str)
         df_tk.loc[df_tk['price_range_expected_date'].notna(), 'price_range'] = np.nan
         df_tk.loc[df_tk['price_expected_date'].notna(), 'notes'] = 'Price expected ' + df_tk['price_expected_date'].astype(str)
-        df_tk.sort_values('time_added', inplace=True)
+        df_tk.sort_values('time_checked', inplace=True)
         df_tk.sort_values('price', inplace=True)
         df_tk.drop_duplicates(subset=['ticker'], inplace=True)
 
