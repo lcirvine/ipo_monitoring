@@ -14,8 +14,7 @@ import numpy as np
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import configparser
-from pg_connection import pg_connection
-from sqlalchemy import types as sql_types
+from pg_connection import pg_connection, sql_types, convert_cols_db
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -337,6 +336,12 @@ class WebDriver:
             writer = csv.writer(f)
             for r in self.webscraping_results:
                 writer.writerow(r)
+        try:
+            df_wr = pd.DataFrame(self.webscraping_results)
+            df_wr.columns = convert_cols_db(df_wr.columns)
+            df_wr.to_sql('webscraping_results', self.conn, if_exists='append', index=False)
+        except Exception as e:
+            logger.error(e, exc_info=sys.exc_info())
 
     def close_down(self):
         self.driver.close()
