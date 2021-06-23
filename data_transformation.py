@@ -176,8 +176,8 @@ class DataTransformation:
         df_tk.sort_values('price', inplace=True)
         df_tk.drop_duplicates(subset=['ticker'], inplace=True)
 
-        df = pd.merge(df_jp.drop(columns=['time_added']),
-                      df_tk[['ticker', 'ipo_date', 'price', 'price_range', 'notes', 'time_added']], how='left',
+        df = pd.merge(df_jp.drop(columns=['time_checked']),
+                      df_tk[['ticker', 'ipo_date', 'price', 'price_range', 'notes', 'time_checked']], how='left',
                       on=['ticker', 'ipo_date'], suffixes=('_jp', '_tk'))
         df['notes'] = df['notes_tk'].fillna('') + df['notes_jp'].fillna('')
         df['ticker'] = df['ticker'].astype(str)
