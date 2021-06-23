@@ -38,6 +38,7 @@ class DataComparison:
         if os.path.exists(pp_file):
             df = pd.concat([pd.read_excel(pp_file, dtype={'CUSIP': str}), df], ignore_index=True, sort=False)
         df['exchange'] = df['exchange'].str.strip()
+        df['deal_status'] = df['deal_status'].str.strip()
         df.sort_values(by='last_updated_date_utc', ascending=False, inplace=True)
         # numeric tickers could appear as duplicates if the same ticker has been interpreted as numeric and string
         # Also could have duplicates if ticker is initially NA, then later added for the same master deal
@@ -144,6 +145,7 @@ class DataComparison:
         df_m['IPO Dates Match'] = df_m['IPO Date'] == df_m['trading_date']
         df_m['IPO Prices Match'] = df_m['Price_external'] == df_m['Price_fds']
         df_m.loc[df_m['Price_external'].isna(), 'IPO Prices Match'] = True
+        df_m.loc[df_m['IPO Date'].isna(), 'IPO Dates Match'] = True
         df_m = df_m[['IPO Dates Match', 'IPO Prices Match', 'iconum', 'Company Name_external', 'Symbol', 'Market',
                      'IPO Date', 'Price_external', 'Price Range', 'Status', 'Notes', 'time_checked', 'Company Name_fds',
                      'master_deal', 'client_deal_id', 'CUSIP', 'ticker', 'exchange', 'Price_fds', 'min_offering_price',
