@@ -14,7 +14,7 @@ website_scraping.main()
 data_transformation.main()
 data_transformation_db.main()
 entity_mapping.main()
-df_summary = data_comparison.main()
+data_comparison.main()
 # Note: email_report is being called separately with another batch file because the run schedule is different
 rpd_creation.main()
 consolidate_webscraping_results()
