@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+import numpy as np
 from source_reference import return_sources
 from pg_connection import pg_connection, convert_cols_db
 from sqlalchemy import types as sql_types
@@ -34,6 +35,14 @@ def entity_mapping_table():
 
 def peo_pipe_table():
     df = pd.read_excel(os.path.join('Reference', 'PEO-PIPE IPO Data.xlsx'))
+    df['exchange'] = df['exchange'].str.strip()
+    df['deal_status'] = df['deal_status'].str.strip()
+    df.sort_values(by='last_updated_date_utc', ascending=False, inplace=True)
+    # numeric tickers could appear as duplicates if the same ticker has been interpreted as numeric and string
+    # Also could have duplicates if ticker is initially NA, then later added for the same master deal
+    df['ticker'] = df['ticker'].astype(str)
+    df.drop_duplicates(subset=['iconum', 'master_deal', 'ticker'], inplace=True)
+    df['ticker'] = df['ticker'].replace(['nan', 'None'], np.nan)
     df.columns = df.columns = convert_cols_db(df.columns)
     df.to_sql('peo_pipe', conn, if_exists='replace', index=False)
 
@@ -62,7 +71,7 @@ def rpd_table():
 
 if __name__ == '__main__':
     try:
-        rpd_table()
+        entity_mapping_table()
     except Exception as e:
         print(e, sys.exc_info())
     finally:
