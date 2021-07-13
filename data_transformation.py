@@ -51,7 +51,7 @@ class DataTransformation:
             # NYSE provides the expected pricing date, the expected listing date is one day after
             df_up['ipo_date'] = df_up['ipo_date'] + pd.offsets.DateOffset(days=1)
             df_up['shares_offered'] = df_up['shares_offered'].str.replace(',', '').astype(int, errors='ignore')
-            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(int, errors='ignore')
+            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(float, errors='ignore')
 
             file_name = 'NYSE Withdrawn'
             assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
