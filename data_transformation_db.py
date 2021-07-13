@@ -461,7 +461,6 @@ class DataTransformation:
             df_tsx['exchange'] = 'TSX'
             df_tsx.loc[df_tsx['company_name'].str.contains(' ETF', na=False), 'security_type'] = 'ETF'
             df_tsx = df_tsx.loc[df_tsx['security_type'].isna()]
-            df_tsx.rename(columns={'ipo_date': 'IPO Date'}, inplace=True)
             tbl = self.sources[source_name]['db_table']
             df_tsx.to_sql(tbl, self.conn, if_exists='replace', index=False,
                           dtype={
