@@ -92,10 +92,12 @@ class EntityMatchBulk:
                                                    auth=self.authorization, headers=self.headers, verify=False)
         entity_task_status_data = json.loads(entity_task_status_response.text)
         task_status = entity_task_status_data['data'][0]['status']
-        if task_status in ['PENDING', 'IN-PROGRESS'] and recheck_count < max_recheck:
+        if task_status in ['PENDING', 'IN_PROGRESS'] and recheck_count < max_recheck:
             recheck_count += 1
             sleep(wait_time)
             return self.get_task_status(eid, recheck_count)
+        elif task_status == 'FAILURE':
+            logger.info(f"Task failed with reason {entity_task_status_data['data'][0]['errorTitle']}")
         else:
             logger.info(f"Duration for Concordance API {entity_task_status_data['data'][0]['processDuration']}")
             logger.info(f"Decision Rate for Concordance API {entity_task_status_data['data'][0]['decisionRate']}")
