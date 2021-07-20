@@ -51,7 +51,7 @@ class DataTransformation:
             # NYSE provides the expected pricing date, the expected listing date is one day after
             df_up['ipo_date'] = df_up['ipo_date'] + pd.offsets.DateOffset(days=1)
             df_up['shares_offered'] = df_up['shares_offered'].str.replace(',', '').astype(int, errors='ignore')
-            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(int, errors='ignore')
+            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(float, errors='ignore')
 
             file_name = 'NYSE Withdrawn'
             assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
@@ -172,12 +172,12 @@ class DataTransformation:
         df_tk.loc[df_tk['price_range_expected_date'].notna(), 'notes'] = 'Price Range expected ' + df_tk['price_range_expected_date'].astype(str)
         df_tk.loc[df_tk['price_range_expected_date'].notna(), 'price_range'] = np.nan
         df_tk.loc[df_tk['price_expected_date'].notna(), 'notes'] = 'Price expected ' + df_tk['price_expected_date'].astype(str)
-        df_tk.sort_values('time_added', inplace=True)
+        df_tk.sort_values('time_checked', inplace=True)
         df_tk.sort_values('price', inplace=True)
         df_tk.drop_duplicates(subset=['ticker'], inplace=True)
 
-        df = pd.merge(df_jp.drop(columns=['time_added']),
-                      df_tk[['ticker', 'ipo_date', 'price', 'price_range', 'notes', 'time_added']], how='left',
+        df = pd.merge(df_jp.drop(columns=['time_checked']),
+                      df_tk[['ticker', 'ipo_date', 'price', 'price_range', 'notes', 'time_checked']], how='left',
                       on=['ticker', 'ipo_date'], suffixes=('_jp', '_tk'))
         df['notes'] = df['notes_tk'].fillna('') + df['notes_jp'].fillna('')
         df['ticker'] = df['ticker'].astype(str)
