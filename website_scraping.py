@@ -14,7 +14,7 @@ import numpy as np
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import configparser
-from pg_connection import pg_connection, sql_types, convert_cols_db
+from pg_connection import pg_connection, sql_types
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -126,7 +126,7 @@ class WebDriver:
                 listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
                 df = pd.DataFrame(listing_info)
                 df.columns = ['listing_info']
-                df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&]*)\s\-')
+                df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&\(\)]*)\s\-')
                 df['ipo_date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
                 df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
                 df['exchange'] = 'Australian Stock Exchange'
@@ -338,7 +338,7 @@ class WebDriver:
                 writer.writerow(r)
         try:
             df_wr = pd.DataFrame(self.webscraping_results)
-            df_wr.columns = convert_cols_db(df_wr.columns)
+            df_wr.columns = ['time_checked', 'source', 'result']
             df_wr.to_sql('webscraping_results', self.conn, if_exists='append', index=False)
         except Exception as e:
             logger.error(e, exc_info=sys.exc_info())
