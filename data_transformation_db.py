@@ -12,6 +12,7 @@ pd.options.mode.chained_assignment = None
 
 class DataTransformation:
     def __init__(self):
+        self.time_checked_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M')
         self.conn = pg_connection()
         self.source_folder = os.path.join(os.getcwd(), 'Data from Sources')
         self.final_cols = ['company_name', 'ticker', 'exchange', 'ipo_date', 'price', 'price_range', 'shares_offered',
@@ -57,7 +58,7 @@ class DataTransformation:
             # NYSE provides the expected pricing date, the expected listing date is one day after
             df_up['ipo_date'] = df_up['ipo_date'] + pd.offsets.DateOffset(days=1)
             df_up['shares_offered'] = df_up['shares_offered'].str.replace(',', '').astype(int, errors='ignore')
-            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(int, errors='ignore')
+            df_up['deal_size'] = df_up['deal_size'].str.replace(',', '').astype(float, errors='ignore')
             tbl = self.sources[source_name]['db_table']
             df_up.to_sql(tbl, self.conn, if_exists='replace', index=False,
                          dtype={
@@ -411,68 +412,32 @@ class DataTransformation:
                   })
         self.append_to_all(df)
 
-    def ca(self):
-
-        def bs():
-            source_name = 'BS-TSX'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
-            bstsx = self.src_dfs.get(source_name).copy()
-            bstsx['exchange'] = 'TSX'
-            bstsx = self.format_date_cols(bstsx, ['ipo_date', 'time_added'])
-            bstsx.loc[bstsx['company_name'].str.contains(' ETF', na=False), 'security_type'] = 'ETF'
-            bstsx.loc[bstsx['company_name'].str.contains(' Fixed Income', na=False), 'security_type'] = 'Fixed Income'
-            bstsx.loc[bstsx['company_name'].str.contains(' Private Pool', na=False), 'security_type'] = 'Private Pool'
-            bstsx = bstsx.loc[bstsx['security_type'].isna()]
-            tbl = self.sources[source_name]['db_table']
-            bstsx.to_sql(tbl, self.conn, if_exists='replace', index=False,
-                         dtype={
-                             'ipo_date': sql_types.Date,
-                             'time_added': sql_types.DateTime,
-                             'time_removed': sql_types.DateTime
-                         })
-
-            source_name = 'BS-TSXV'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
-            bstsxv = self.src_dfs.get(source_name).copy()
-            bstsxv['exchange'] = 'TSX Venture'
-            bstsxv = self.format_date_cols(bstsxv, ['ipo_date', 'time_added'])
-            bstsxv.loc[bstsxv['company_name'].str.contains(' ETF', na=False), 'security_type'] = 'ETF'
-            bstsxv.loc[bstsxv['company_name'].str.contains(' Fixed Income', na=False), 'security_type'] = 'Fixed Income'
-            bstsxv.loc[bstsxv['company_name'].str.contains(' Private Pool', na=False), 'security_type'] = 'Private Pool'
-            bstsxv = bstsxv.loc[bstsxv['security_type'].isna()]
-            tbl = self.sources[source_name]['db_table']
-            bstsxv.to_sql(tbl, self.conn, if_exists='replace', index=False,
-                          dtype={
-                              'ipo_date': sql_types.Date,
-                              'time_added': sql_types.DateTime,
-                              'time_removed': sql_types.DateTime
-                          })
-
-            return pd.concat([bstsx, bstsxv], ignore_index=True)
-
-        def tsx():
-            source_name = 'TSX'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
-            df_tsx = self.src_dfs.get(source_name).copy()
-            df_tsx = self.format_date_cols(df_tsx, ['ipo_date', 'time_added'])
-            df_tsx['ticker'] = df_tsx['company_name'].str.extract(r'\(([a-zA-Z\.,\s]*)\)')
-            df_tsx['company_name'] = df_tsx['company_name'].str.extract(r'^([a-zA-Z\.\s\d&,\-]*)[\xa0|\(\+]')
-            df_tsx['company_name'] = df_tsx['company_name'].str.strip()
-            df_tsx['exchange'] = 'TSX'
-            df_tsx.loc[df_tsx['company_name'].str.contains(' ETF', na=False), 'security_type'] = 'ETF'
-            df_tsx = df_tsx.loc[df_tsx['security_type'].isna()]
-            tbl = self.sources[source_name]['db_table']
-            df_tsx.to_sql(tbl, self.conn, if_exists='replace', index=False,
-                          dtype={
-                              'ipo_date': sql_types.Date,
-                              'time_added': sql_types.DateTime,
-                              'time_removed': sql_types.DateTime
-                          })
-            return df_tsx
-
-        df_b = bs()
-        df_t = tsx()
-        df = pd.concat([df_b, df_t], join='outer', ignore_index=True).drop_duplicates(subset=['company_name'])
+    def tmx(self):
+        source_name = 'TMX'
+        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        df = self.src_dfs.get(source_name).copy()
+        df.rename(columns={'list_symbol': 'ticker', 'effective_date': 'ipo_date', 'details': 'notes'}, inplace=True)
+        latest = df.loc[(df['file'].str[:8] == df['file'].max()[:8]), 'identification'].to_list()
+        df.loc[(~df['identification'].isin(latest) & df['time_removed'].isna()), 'time_removed'] = self.time_checked_str
+        df.sort_values(by=['entry_date', 'file', 'time_added'], inplace=True)
+        ss = [col for col in df.columns if col not in ('time_added', 'file')]
+        df.drop_duplicates(subset=ss, inplace=True)
+        df = df.loc[
+            (df['change_type'] == 'New Listing') &
+            (~df['notes'].str.contains('transfer', na=False, case=False)) &
+            (~df['company_name'].str.contains(' ETF| Fund', na=False)) &
+            (~df['security_description'].str.contains('Debentures|Warrants', na=False))
+        ]
+        tbl = self.sources[source_name]['db_table']
+        df.to_sql(tbl, self.conn, if_exists='replace', index=False,
+                  dtype={
+                      'ipo_date': sql_types.Date,
+                      'entry_date': sql_types.Date,
+                      'modification_date': sql_types.Date,
+                      'identification': sql_types.Integer,
+                      'time_added': sql_types.DateTime,
+                      'time_removed': sql_types.DateTime
+                  })
         self.append_to_all(df)
 
     def frankfurt(self):
@@ -693,8 +658,6 @@ class DataTransformation:
     def formatting_all(self):
         # removing commas from company name - Concordance API will interpret those as new columns
         self.df_all['company_name'] = self.df_all['company_name'].str.replace(',', '', regex=False)
-        # for col in ['ipo_date', 'time_added']:
-        #     self.df_all[col] = self.df_all[col].astype('datetime64[ns]')
         self.df_all = self.format_date_cols(self.df_all, ['ipo_date', 'time_added'])
         self.df_all.loc[self.df_all['ipo_date'].dt.date > date.today(), 'status'] = 'Upcoming ' + self.df_all[
             'status'].fillna('')
@@ -748,7 +711,7 @@ def main():
         dt.euronext()
         dt.aastocks()
         dt.lse()
-        dt.ca()
+        dt.tmx()
         dt.frankfurt()
         dt.krx()
         dt.asx()
