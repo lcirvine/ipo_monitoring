@@ -126,7 +126,7 @@ class WebDriver:
                 listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
                 df = pd.DataFrame(listing_info)
                 df.columns = ['listing_info']
-                df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&\(\)]*)\s\-')
+                df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&\(\)\-]*)\s\-')
                 df['ipo_date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
                 df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
                 df['exchange'] = 'Australian Stock Exchange'
