@@ -495,6 +495,8 @@ class DataTransformation:
         source_name = 'ASX'
         assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
         df = self.src_dfs.get(source_name).copy()
+        df.sort_values(by=['time_added'], inplace=True)
+        df.drop_duplicates(subset=[col for col in df.columns if 'time' not in col], inplace=True)
         tbl = self.sources[source_name]['db_table']
         df.to_sql(tbl, self.conn, if_exists='replace', index=False,
                   dtype={
