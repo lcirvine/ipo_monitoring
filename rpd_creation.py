@@ -271,16 +271,17 @@ class RPDCreation:
                     }
                 ]
             }
-            res = self.session.post(url=endpoint, data=json.dumps(rpd_request), headers=self.headers)
-            if res.ok:
-                rpd_num = res.headers['X-IS-ID']
-                rpd_date = res.headers['Date']
-                # rpd_api_link = res.headers['Location']
-                rpd_dict['Company Name'].append(company_name)
-                rpd_dict['RPD Number'].append(rpd_num)
-                rpd_dict['RPD Link'].append('https://is.factset.com/rpd/summary.aspx?messageId=' + str(rpd_num))
-                rpd_dict['RPD Creation Date'].append(rpd_date)
-                rpd_dict['RPD Status'].append('Pending')
+            if company_name is not None and company_name != '':
+                res = self.session.post(url=endpoint, data=json.dumps(rpd_request), headers=self.headers)
+                if res.ok:
+                    rpd_num = res.headers['X-IS-ID']
+                    rpd_date = res.headers['Date']
+                    # rpd_api_link = res.headers['Location']
+                    rpd_dict['Company Name'].append(company_name)
+                    rpd_dict['RPD Number'].append(rpd_num)
+                    rpd_dict['RPD Link'].append('https://is.factset.com/rpd/summary.aspx?messageId=' + str(rpd_num))
+                    rpd_dict['RPD Creation Date'].append(rpd_date)
+                    rpd_dict['RPD Status'].append('Pending')
             sleep(1)
         logger.info(f"Created {len(rpd_dict['RPD Number'])} new RPDs: {', '.join([str(num) for num in rpd_dict['RPD Number']])}")
         return rpd_dict
