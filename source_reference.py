@@ -243,7 +243,7 @@ website_sources = {
         'url': 'https://live.euronext.com/en/ipo-showcase',
         'table_num': 0,
         'table_elem': 'table',
-        'table_attrs': {'class': ['table', 'views-table', 'views-view-table', 'cols-5']},
+        'table_attrs': {'class': ['table', 'views-table', 'views-view-table', 'cols-6']},
         'row_elem': 'tr',
         # 'row_attrs': {},
         'cell_elem': 'td',
@@ -255,6 +255,7 @@ website_sources = {
         'columns': [
             'ipo_date',
             'company_name',
+            'ticker',
             'isin',
             'location',
             'exchange'
