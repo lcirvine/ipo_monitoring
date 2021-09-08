@@ -372,7 +372,6 @@ class DataTransformation:
                       'time_added': sql_types.DateTime,
                       'time_removed': sql_types.DateTime
                   })
-        df.rename(columns={'isin': 'ticker'}, inplace=True)
         self.append_to_all(df)
 
     def aastocks(self):

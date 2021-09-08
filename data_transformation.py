@@ -246,7 +246,6 @@ class DataTransformation:
         df = self.format_date_cols(df, ['ipo_date'], dayfirst=True)
         df = self.format_date_cols(df, ['time_checked'])
         df['exchange'] = df['exchange'] + ' ' + df['location']
-        df.rename(columns={'isin': 'ticker'}, inplace=True)
         self.append_to_all(df)
 
     def aastocks(self):
