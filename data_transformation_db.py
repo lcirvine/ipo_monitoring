@@ -425,7 +425,7 @@ class DataTransformation:
             (df['change_type'] == 'New Listing') &
             (~df['notes'].str.contains('transfer', na=False, case=False)) &
             (~df['company_name'].str.contains(' ETF| Fund', na=False)) &
-            (~df['security_description'].str.contains('Debentures|Warrants', na=False))
+            (~df['security_description'].str.contains('Debentures|Warrants|Rights|Common share purchase warrants', na=False))
         ]
         tbl = self.sources[source_name]['db_table']
         df.to_sql(tbl, self.conn, if_exists='replace', index=False,
