@@ -20,14 +20,14 @@ class RPDCreation:
         self.config.read('api_key.ini')
         self.source_file = os.path.join('Reference', 'IPO Monitoring Data.xlsx')
         self.result_file = os.path.join(os.getcwd(), 'Reference', 'IPO Monitoring RPDs.xlsx')
+        self.session = self.create_session()
+        self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+        self.base_url = 'http://is.factset.com/rpd/api/v2/'
         self.wd_file = os.path.join(os.getcwd(), 'Reference', 'Withdrawn IPOs.xlsx')
         self.df_ipo = self.return_formatted_df_from_file(self.source_file)
         self.df_wd = self.return_formatted_df_from_file(self.wd_file)
         self.df_rpd = self.rpd_data_frame()
         self.df = self.create_main_data_frame()
-        self.session = self.create_session()
-        self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
-        self.base_url = 'http://is.factset.com/rpd/api/v2/'
         self.rpd_cols = ['iconum', 'CUSIP', 'Company Name', 'Symbol', 'Market', 'IPO Date', 'Price', 'Price Range',
                          'Status', 'Notes', 'Last Checked', 'IPO Deal ID']
 
@@ -61,13 +61,63 @@ class RPDCreation:
         df['formatted company name'] = df['formatted company name'].str.strip()
         return df
 
+    def create_session(self) -> requests.Session:
+        """
+        Creates a session using the uername and password provided in the config file.
+
+        :return: A session that will be used in RPDCreation
+        """
+        uname = self.config.get('credentials', 'username')
+        pword = self.config.get('credentials', 'password')
+        session = requests.Session()
+        session.auth = HttpNtlmAuth(uname, pword, session)
+        return session
+
     def rpd_data_frame(self) -> pd.DataFrame:
         """
         Returns a data frame with the existing RPD information
 
         :return:
         """
-        return pd.read_excel(self.result_file, dtype={'iconum': str})
+
+        def user_created_rpds() -> pd.DataFrame:
+            """
+            Returns a data frame with the all RPDs created manually (i.e. not created by svc-ipo-monitoring)
+
+            :return:
+            """
+            view_id = 31591815  # manually created IPO Monitoring RPDs
+            view_endpoint = f'{self.base_url}view/{view_id}/results?page=1&pageSize=300'
+            view_results = self.session.get(view_endpoint, headers=self.headers)
+            view_json = view_results.json()
+            view_data = []
+            for row in view_json['Rows']:
+                row_data = [c['Value'] for c in row['Cells']]
+                view_data.append(row_data)
+            df_view = pd.DataFrame(view_data)
+            df_view.columns = [c['ColumnName'] for c in view_json['Columns']]
+            df_view.rename(columns={
+                'Message': 'RPD Number',
+                'createdDate': 'RPD Creation Date',
+                'answer_31405': 'IPO Date',
+                'answer_31407': 'CUSIP',
+                'answer_31406': 'Market',
+                'answer_31408': 'Symbol',
+                'Status': 'RPD Status'
+            }, inplace=True)
+            df_view['RPD Link'] = 'https://is.factset.com/rpd/summary.aspx?messageId=' + df_view['RPD Number'].astype(
+                str)
+            df_view['RPD Creation Date'] = pd.to_datetime(df_view['RPD Creation Date'], errors='coerce')
+            df_view['RPD Creation Date']= df_view['RPD Creation Date'].dt.tz_localize(None)
+            df_view = df_view[['Symbol', 'RPD Number', 'RPD Link', 'RPD Creation Date', 'RPD Status']]
+            df_view = df_view.merge(self.df_ipo, on='Symbol')
+            logger.info(f'Matched {len(df_view)} manually created RPDs to IPOs.')
+            return df_view
+        df_rpd = pd.read_excel(self.result_file, dtype={'iconum': str})
+        df_user_created_rpds = user_created_rpds()
+        df_rpd = pd.concat([df_rpd, df_user_created_rpds])
+        df_rpd.sort_values(by=['RPD Status', 'RPD Creation Date'], na_position='first', inplace=True)
+        return df_rpd
 
     def create_main_data_frame(self):
         """
@@ -80,18 +130,6 @@ class RPDCreation:
         df.sort_values(by=['RPD Creation Date'], inplace=True)
         df.drop_duplicates(subset='formatted company name', inplace=True, ignore_index=True)
         return df
-
-    def create_session(self) -> requests.Session:
-        """
-        Creates a session using the uername and password provided in the config file.
-
-        :return: A session that will be used in RPDCreation
-        """
-        uname = self.config.get('credentials', 'username')
-        pword = self.config.get('credentials', 'password')
-        session = requests.Session()
-        session.auth = HttpNtlmAuth(uname, pword, session)
-        return session
 
     def get_rpd_status(self, rpd_num: int) -> str:
         """
