@@ -207,7 +207,7 @@ class DataTransformation:
             df = self.format_date_cols(df, ['ipo_date', 'release_date', 'time_checked'])
             df['exchange'] = 'Shenzhen Stock Exchange'
             df['ticker'] = df['ticker'].astype(str)
-            df['shares_offered'] = df['shares_offered'].astype(int, errors='ignore') * 10000
+            df['shares_offered'] = pd.to_numeric(df['shares_offered'], errors='coerce') * 10000
             return df
 
         def eastmoney():

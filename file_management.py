@@ -3,7 +3,7 @@ import sys
 import re
 import shutil
 from datetime import datetime, timedelta
-from logging_ipo_dates import logger, log_folder, log_file
+from logging_ipo_dates import logger, log_folder, log_file, handler
 
 
 def delete_old_files(folder: str, num_days: int = 30) -> list:
@@ -50,7 +50,7 @@ def delete_old_files_test(folder: str, num_days: int = 30) -> list:
 
 def archive_logs(num_days: int = 30):
     current_log_file = os.path.join(log_folder, log_file)
-    with open(current_log_file, 'r') as f:
+    with open(current_log_file, 'r', encoding='utf8') as f:
         all_lines = f.readlines()
     key_dates = {'first_log_date': return_date_str(all_lines[0]), 'last_log_date': return_date_str(all_lines[-1])}
     old_date = datetime.utcnow() - timedelta(days=num_days)
@@ -59,13 +59,8 @@ def archive_logs(num_days: int = 30):
         if first_log_date_datetime < old_date:
             log_file_name, log_file_ext = os.path.splitext(log_file)
             archived_log = f"{log_file_name} {key_dates.get('first_log_date')} - {key_dates.get('last_log_date', datetime.today().strftime('%Y-%m-%d'))}{log_file_ext}"
-            # TODO: this will fail with PermissionError
-            #  The process cannot access the file because it is being used by another process
-            # os.rename(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
-            try:
-                shutil.move(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
-            except PermissionError as e:
-                logger.error(e)
+            handler.close()
+            shutil.move(current_log_file, os.path.join(log_folder, 'Previous Logs', archived_log))
 
 
 def return_date_str(text: str, date_pat: str = r"(\d{4}\-\d{2}\-\d{2})"):

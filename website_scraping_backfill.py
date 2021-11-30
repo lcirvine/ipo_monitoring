@@ -84,7 +84,7 @@ def main():
     source_d = {'source': 'Euronext',
                 'link_base': 'https://live.euronext.com',
                 'next_xpath': '//*[@title="Go to next page"]',
-                'cols': ['Date', 'Company name', 'ISIN code', 'Location', 'Market', 'Link']}
+                'cols': ['Date', 'Company name', 'Ticker', 'ISIN code', 'Location', 'Market', 'Link']}
     bf = BackFill(url='https://live.euronext.com/en/ipo-showcase', headless=False, **source_d)
     try:
         bf.parse_table()

@@ -310,7 +310,7 @@ class DataTransformation:
             df = self.format_date_cols(df, ['ipo_date', 'release_date', 'time_added'])
             df['exchange'] = 'Shenzhen Stock Exchange'
             df['ticker'] = df['ticker'].astype(str)
-            df['shares_offered'] = df['shares_offered'].astype(int, errors='ignore') * 10000
+            df['shares_offered'] = pd.to_numeric(df['shares_offered'], errors='coerce') * 10000
             tbl = self.sources[source_name]['db_table']
             df.to_sql(tbl, self.conn, if_exists='replace', index=False,
                       dtype={
@@ -352,8 +352,9 @@ class DataTransformation:
         df_em = eastmoney()
         df_em.sort_values(by=['time_added'], ascending=False, inplace=True)
         df_em.drop_duplicates(subset=['ticker'], inplace=True)
+        df_em = df_em.loc[df_em['ipo_date'].notna(), ['ticker', 'ipo_date']]
         df = pd.merge(df, df_em[['ticker', 'ipo_date']], how='left', on='ticker', suffixes=('_exch', '_em'))
-        df['ipo_date'] = df['ipo_date_exch'].fillna(df['ipo_date_em'])
+        df['ipo_date'] = df['ipo_date_exch'].fillna(df['ipo_date_em'].fillna(pd.NaT))
         df.sort_values(by=['time_added'], ascending=False, inplace=True)
         df.drop_duplicates(subset=['company_name', 'ticker'], inplace=True)
         self.append_to_all(df)
