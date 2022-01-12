@@ -15,6 +15,7 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import configparser
 from pg_connection import pg_connection, sql_types
+from collections import defaultdict
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -75,8 +76,9 @@ class WebDriver:
         """
         url = kwargs.get('url')
         table_elem = kwargs.get('table_elem')
-        table_num = kwargs.get('table_num')
+        table_num = kwargs.get('table_num', 0)
         table_attrs = kwargs.get('table_attrs')
+        table_title = kwargs.get('table_title')
         row_elem = kwargs.get('row_elem')
         cell_elem = kwargs.get('cell_elem')
         header_elem = kwargs.get('header_elem')
@@ -86,7 +88,9 @@ class WebDriver:
         column_names_as_row = kwargs.get('column_names_as_row')
 
         soup = self.return_soup()
-        if table_attrs is None:
+        if table_title is not None and soup.find(text=table_title) is not None:
+            table = soup.find(text=table_title).parent.parent.find(table_elem)
+        elif table_attrs is None:
             table = soup.find_all(table_elem)[table_num]
         else:
             table = soup.find(table_elem, attrs=table_attrs)
@@ -238,11 +242,53 @@ class WebDriver:
                 logger.error(f"ERROR for SpotlightAPI")
                 logger.error(e, exc_info=sys.exc_info())
 
+        def ipohub():
+            try:
+                url = self.sources['IPOHub'].get('url')
+                self.driver.get(url)
+                soup = self.return_soup()
+                ipo_data = defaultdict(list)
+                for ipo in soup.find_all('a', attrs={'class': 'info-card'}):
+                    opts = {}
+                    for opt in ipo.find_all('div', attrs={'class': 'info-card__option'}):
+                        opt_items = opt.find_all('span')
+                        opts[opt_items[0].text.strip()] = opt_items[1].text.strip()
+
+                    card_items = {
+                        'company_name': ipo.find('div', attrs={'class': 'info-card__title'}).text.strip(),
+                        'exchange': ipo.find('div', attrs={'class': 'info-card__company-country'}).text.strip(),
+                        'listing_type': ipo.find('span', attrs={'class': 'info-card__tag-item'}).text.strip(),
+                        'subscription_period': opts.get('Subscr. period'),
+                        'price': opts.get('Price per share'),
+                        'market_cap': opts.get('Pre-money valuation'),
+                        'deal_size': opts.get('Target to raise'),
+                        'status': opts.get('Offer status'),
+                        'ipo_date': opts.get('First trading date'),
+                    }
+                    for k, v in card_items.items():
+                        ipo_data[k].append(v)
+
+                df = pd.DataFrame(ipo_data)
+                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce')
+                # the website will provide only a year if they expect the IPO to list some time during the year
+                # that is gets interpreted as Jan. 1 of that year when converting to datetime
+                # any ipo_date earlier than today (i.e. Jan 1 this year) should not be considered as an actual date
+                df.loc[df['ipo_date'] <= datetime.utcnow(), 'ipo_date'] = pd.NaT
+                df.loc[df['price'].str.contains('-', na=False), 'price_range'] = df['price']
+                df['currency'] = df['price'].str.extract(r"\s(\w{3})")
+                df['price'] = pd.to_numeric(df['price'].str.replace(r"(\s\w{3})", '', regex=True), errors='coerce')
+                df['time_checked'] = self.time_checked_str
+                return df
+            except Exception as e:
+                logger.error(f"ERROR for IPOHub")
+                logger.error(e, exc_info=sys.exc_info())
+
         special_case_dict = {
             'ASX': asx(),
             'TokyoIPO': tkipo(),
             'AlphaVantage': av_api(),
-            'SpotlightAPI': spotlight_api()
+            'SpotlightAPI': spotlight_api(),
+            'IPOHub': ipohub()
         }
 
         for src, df in special_case_dict.items():
@@ -305,7 +351,7 @@ class WebDriver:
             for col in df.columns:
                 if col in df_s.columns:
                     df[col] = df[col].astype(df_s[col].dtype.name)
-            merge_cols = [c for c in df.columns if c != 'time_checked']
+            merge_cols = [c for c in df.columns if c not in ('time_checked', 'time_added', 'time_removed')]
             df_m = pd.merge(df_s, df, how='outer', on=merge_cols, suffixes=('', '_'), indicator=True)
             df_m['time_added'].fillna(df_m['time_checked'], inplace=True)
             df_m.loc[

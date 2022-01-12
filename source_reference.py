@@ -83,6 +83,7 @@ website_sources = {
         'table_num': 2,
         'table_elem': 'tbody',
         # 'table_attrs': {'class': 'market-calendar-table__body'},
+        'table_title': 'Upcoming',
         'row_elem': 'tr',
         # 'row_attrs': {},
         'cell_elem': ['th', 'td'],
@@ -114,6 +115,7 @@ website_sources = {
         'table_num': 4,
         'table_elem': 'tbody',
         # 'table_attrs': {'class': 'market-calendar-table__body'},
+        'table_title': 'Priced',
         'row_elem': 'tr',
         # 'row_attrs': {},
         'cell_elem': ['th', 'td'],
@@ -146,6 +148,7 @@ website_sources = {
         'table_num': 8,
         'table_elem': 'tbody',
         # 'table_attrs': {'class': 'market-calendar-table__body'},
+        'table_title': 'Withdrawn',
         'row_elem': 'tr',
         # 'row_attrs': {},
         'cell_elem': ['th', 'td'],
@@ -803,6 +806,15 @@ other_sources = {
         'file': 'TMX',
         'db_table_raw': 'source_tmx_raw',
         'db_table': 'source_tmx'
+    },
+    'IPOHub': {
+        'source_type': 'special_case_website',
+        'exchange': 'multiple',
+        'location': 'Nordic',
+        'url': 'https://www.ipohub.io/listings?current-tab=upcoming&view=card&type=ipo&type=listing&market=274&market=278&market=279&market=280&market=297&market=289&market=290&market=291&market=298&market=301&take=100',
+        'file': 'IPOHub',
+        'db_table_raw': 'source_ipohub_raw',
+        'db_table': 'source_ipohub',
     }
 }
 
@@ -1010,34 +1022,6 @@ unused_sources = {
         'db_table_raw': 'source_tsx_raw',
         'db_table': 'source_tsx'
     },
-    'IPOHub': {
-        'exchange': 'Multiple',
-        # 'rank': None,
-        # 'location': None,
-        # 'url': 'https://www.ipohub.io/listings?current-tab=upcoming&view=list&type=ipo&type=listing&take=80',
-        # 'table_num': None,
-        'table_elem': 'div',
-        'table_attrs': {'class': 'latest-offer-table'},
-        'row_elem': 'a',
-        # 'row_attrs': {},
-        'cell_elem': 'div',
-        # 'cell_attrs': {},
-        # 'header_elem': None,
-        # 'header_attrs': {},
-        # 'link_elem': '',
-        # 'link_key': '',
-        'columns': [
-            'Company',
-            'Sector',
-            'Type',
-            'Subscription period',
-            'First Trading Date',
-            'Price',
-            'Pre-money Valuation',
-            'Follow'
-        ],
-        'file': 'IPOHub'
-    },
     'Nyemissioner': {
         'exchange': 'Multiple',
         'rank': None,
@@ -1202,4 +1186,4 @@ def main(create_ref: bool = False):
 
 
 if __name__ == '__main__':
-    main()
+    main(create_ref=True)

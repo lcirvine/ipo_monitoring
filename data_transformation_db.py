@@ -612,7 +612,9 @@ class DataTransformation:
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['exchange'] = 'Nasdaq Nordic'
         # Nasdaq Nordic comes with columns for last price and Percent Change change in price which change every day
-        df.drop(columns=['last_price', 'percent_change'], inplace=True)
+        for col in ['last_price', 'percent_change']:
+            if col in df.columns:
+                df.drop(columns=col, inplace=True)
         df.sort_values(by='time_added', inplace=True)
         df.drop_duplicates(inplace=True)
         tbl = self.sources[source_name]['db_table']
@@ -654,6 +656,21 @@ class DataTransformation:
                       'ipo_date': sql_types.Date,
                       'time_added': sql_types.DateTime,
                       'time_removed': sql_types.DateTime
+                  })
+        self.append_to_all(df)
+
+    def ipohub(self):
+        source_name = 'IPOHub'
+        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        df = self.src_dfs.get(source_name).copy()
+        df = self.format_date_cols(df, ['ipo_date', 'time_added'])
+        tbl = self.sources[source_name]['db_table']
+        df.to_sql(tbl, self.conn, if_exists='replace', index=False,
+                  dtype={
+                      'ipo_date': sql_types.Date,
+                      'time_added': sql_types.DateTime,
+                      'time_removed': sql_types.DateTime,
+                      'price': sql_types.Float
                   })
         self.append_to_all(df)
 
@@ -725,6 +742,7 @@ def main():
         dt.nasdaqnordic()
         dt.spotlight()
         dt.italy()
+        dt.ipohub()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))

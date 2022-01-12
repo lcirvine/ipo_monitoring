@@ -430,6 +430,13 @@ class DataTransformation:
         df = df.loc[~df['listing_type'].str.contains('Transition from')]
         self.append_to_all(df)
 
+    def ipohub(self):
+        file_name = 'IPOHub'
+        assert file_name in self.src_dfs.keys(), f"No CSV file for {file_name} in Source Data folder."
+        df = self.src_dfs.get(file_name).copy()
+        df = self.format_date_cols(df, ['ipo_date', 'time_checked'])
+        self.append_to_all(df)
+
     def formatting_all(self):
         # removing commas from company name - Concordance API will interpret those as new columns
         self.df_all['company_name'] = self.df_all['company_name'].str.replace(',', '', regex=False)
@@ -483,6 +490,7 @@ def main():
         dt.nasdaqnordic()
         dt.spotlight()
         dt.italy()
+        dt.ipohub()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))
