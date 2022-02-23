@@ -195,21 +195,22 @@ class WebDriver:
                     df.columns = df.loc[0]
                     df = df.drop(0).reset_index(drop=True)
                     df = df.dropna()
-                    df.loc[df['name'].str.contains(r' Warrant'), 'assetType'] = 'Warrants'
-                    df.loc[df['name'].str.contains(r' Right'), 'assetType'] = 'Rights'
-                    df.loc[df['name'].str.contains(r' Unit'), 'assetType'] = 'Units'
-                    df['assetType'].fillna('Shares', inplace=True)
-                    for c in ['priceRangeLow', 'priceRangeHigh']:
-                        df[c] = pd.to_numeric(df[c], errors='coerce')
-                    df['time_checked'] = self.time_checked_str
-                    df.sort_values(by=['ipoDate', 'name'], inplace=True)
-                    df.rename(columns={
-                        'symbol': 'ticker',
-                        'name': 'company_name',
-                        'ipoDate': 'ipo_date',
-                        'priceRangeLow': 'price_range_low',
-                        'priceRangeHigh': 'price_range_high'}, inplace=True)
-                    return df
+                    if len(df) > 0:
+                        df.loc[df['name'].str.contains(r' Warrant'), 'assetType'] = 'Warrants'
+                        df.loc[df['name'].str.contains(r' Right'), 'assetType'] = 'Rights'
+                        df.loc[df['name'].str.contains(r' Unit'), 'assetType'] = 'Units'
+                        df['assetType'].fillna('Shares', inplace=True)
+                        for c in ['priceRangeLow', 'priceRangeHigh']:
+                            df[c] = pd.to_numeric(df[c], errors='coerce')
+                        df['time_checked'] = self.time_checked_str
+                        df.sort_values(by=['ipoDate', 'name'], inplace=True)
+                        df.rename(columns={
+                            'symbol': 'ticker',
+                            'name': 'company_name',
+                            'ipoDate': 'ipo_date',
+                            'priceRangeLow': 'price_range_low',
+                            'priceRangeHigh': 'price_range_high'}, inplace=True)
+                        return df
             except Exception as e:
                 logger.error(f"ERROR for AlphaVantage")
                 logger.error(e, exc_info=sys.exc_info())
