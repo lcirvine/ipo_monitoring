@@ -9,6 +9,9 @@
 *.log
 *.json
 *.sql
+*.yaml
+*.toml
+*.zip
 .idea/
 No Longer Needed/
 Logs/

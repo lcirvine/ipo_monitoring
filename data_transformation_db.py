@@ -611,7 +611,7 @@ class DataTransformation:
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['exchange'] = 'Nasdaq Nordic'
-        # Nasdaq Nordic comes with columns for last price and Percent Change change in price which change every day
+        # Nasdaq Nordic comes with columns for last price and percent change in price which change every day
         for col in ['last_price', 'percent_change']:
             if col in df.columns:
                 df.drop(columns=col, inplace=True)

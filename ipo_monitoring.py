@@ -6,6 +6,7 @@ import data_transformation_db
 import entity_mapping
 import data_comparison
 import file_management
+import workflow
 import rpd_creation
 
 logger.info('-' * 100)
@@ -15,7 +16,7 @@ data_transformation.main()
 data_transformation_db.main()
 entity_mapping.main()
 data_comparison.main()
-# Note: email_report is being called separately with another batch file because the run schedule is different
+workflow.main()
 rpd_creation.main()
 consolidate_webscraping_results()
 file_management.main()
