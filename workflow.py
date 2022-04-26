@@ -8,6 +8,7 @@ import json
 import time
 import os
 import sys
+from io import StringIO
 from logging_ipo_dates import logger
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -122,16 +123,21 @@ class GenesysAPI:
         res_json = json.loads(res.text)
         return pd.json_normalize(res_json['data'])
 
-    def files(self, file_id: str, process_name: str):
+    def files(self, file_id: str, process_name: str) -> dict:
+        """Checks the status of a process like bulk upload, bulk feed or bulk operation
+
+        :param file_id: The csv_uuid from the presigned URL
+        :param process_name: Valid processes are 'BulkUpload', 'BulkOpsStatus', 'BulkFeed'.
+            The process name must match the process name used when getting the presigned URL
+        :return: JSON data from response
+        """
         endpoint = f"{self.base_url}/api/v1/files/{file_id}"
         valid_processes = ('BulkUpload', 'BulkOpsStatus', 'BulkFeed')
         if process_name not in valid_processes:
             raise ValueError(f"Invalid process: {process_name}, valid process names are {', '.join(valid_processes)}")
-        parameters = json.dumps({'process_name': process_name})
-        res = requests.get(url=endpoint, params=parameters, headers=self.headers, verify=False)
+        res = requests.get(url=endpoint, params={'process_name': process_name}, headers=self.headers, verify=False)
         assert res.ok, f"Error\n{res.status_code}\n{res.text}"
         res_json = json.loads(res.text)
-        # todo: have not confirmed this works
         return res_json
 
     def wf_properties(self, wf_id: int) -> dict:
@@ -229,8 +235,8 @@ class GenesysAPI:
         2). upload the file to that presigned URL in binary
         3). check the result of the upload and download the results
 
-        :param wf_id:
-        :param file:
+        :param wf_id: integer identifying the workflow
+        :param file: the absolute path of the CSV file to be uploaded
         :return:
         """
         endpoint = f"{self.base_url}/api/v1/workflows/{wf_id}/bulkfeed"
@@ -254,14 +260,12 @@ class GenesysAPI:
             res = requests.put(url=bulk_upload_url, data=data, headers=upload_headers)
             assert res.ok, f"Error when uploading file\n{res.status_code}\n{res.text}"
 
-        def check_result(csv_uuid, process_name='BulkUpload'):
+        def check_result(csv_uuid, process_name='BulkFeed'):
             file_link = ''
             is_timedout = True
             timedout_dict = {'true': True, 'false': False}
             attempt = 0
             max_retries = 5
-            # process name is not required so may not be necessary here
-            # available process names are  ['BulkUpload', 'BulkOpsStatus', 'BulkFeed']
             while is_timedout and attempt < max_retries:
                 bulk_upload_file_response = self.files(file_id=csv_uuid, process_name=process_name)
                 file_link = bulk_upload_file_response['data']['file_link']
@@ -270,11 +274,13 @@ class GenesysAPI:
                 logger.info(f"Attempt {attempt}\n{bulk_upload_file_response}")
                 time.sleep(10)
             if file_link != '':
-                res = requests.get(url=file_link, headers=self.headers, verify=False)
+                res = requests.get(url=file_link, verify=False)
                 assert res.ok, f"Error when downloading file\n{res.status_code}\n{res.text}"
-                csv_str = res.text
-                with open(f"bulk_upload_{file_name}_response.csv", 'w') as f:
-                    f.write(csv_str)
+                df_res = pd.read_csv(StringIO(res.text))
+                new_tasks = df_res.loc[df_res['message'].str.contains('created successfully'), 'task_id'].tolist()
+                dupe_tasks = df_res.loc[df_res['message'].str.contains('already exists'), 'task_id'].tolist()
+                logger.info(f"{len(new_tasks)} new tasks created: {','.join(new_tasks)}")
+                logger.info(f"{len(dupe_tasks)} duplicate tasks: {','.join(dupe_tasks)}")
 
         csv_uuid, bulk_upload_url = get_presigned_url()
         upload_csv_file(bulk_upload_url, file)
