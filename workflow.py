@@ -76,7 +76,7 @@ WHERE
 
 
 class GenesysAPI:
-    def __init__(self, content_set: str, user_id: int, environment: str = 'stg'):
+    def __init__(self, content_set: str, user_id: int, environment: str = 'prod'):
         self.content_set = content_set.lower()
         self.user_id = user_id
         self.environment = environment.lower()
@@ -306,7 +306,7 @@ class GenesysAPI:
 
 def main():
     wf_id = config['workflow']['id'].get()  # 15490
-    gs = GenesysAPI(content_set='peopipe', user_id=21160, environment='stg')
+    gs = GenesysAPI(content_set='peopipe', user_id=21160, environment='prod')
     df_tasks_start = gs.task_count(wf_id)
     num_tasks_start = df_tasks_start['total_tasks'].sum()
 
