@@ -52,7 +52,7 @@ class EntityMatchBulk:
             # create request with concordance API
             entity_task_endpoint = 'https://api.factset.com/content/factset-concordance/v2/entity-task'
             entity_task_request = {
-                'universeId': 708,
+                'universeId': str(708),
                 'taskName': self.file_name,
                 'clientIdColumn': 'client_id',
                 'nameColumn': 'Company Name',
