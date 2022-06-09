@@ -6,13 +6,11 @@ import json
 from datetime import datetime
 from time import sleep
 import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from configparser import ConfigParser
 from pg_connection import pg_connection, convert_cols_db
 from logging_ipo_dates import logger, error_email, log_folder
 
 pd.options.mode.chained_assignment = None
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class EntityMatchBulk:
@@ -26,7 +24,7 @@ class EntityMatchBulk:
         self.file_name = f'upcoming_IPO_entity_mapping_{datetime.utcnow().strftime("%Y-%m-%d %H%M")}'
         self.file = os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '.csv')
         self.authorization = (self.config.get('FDSAPI', 'USERNAME-SERIAL'), self.config.get('FDSAPI', 'API-Key'))
-        self.headers = {'Accept': 'application/json;charset=utf-8'}
+        self.headers = {'Content-Type': 'application/json', 'Accept': 'application/json;charset=utf-8'}
 
     def create_csv(self, recheck_all: bool = False):
         # create a dataframe of all company names without iconums including new names found
@@ -52,8 +50,9 @@ class EntityMatchBulk:
     def entity_mapping_api(self):
         if os.path.exists(self.file):
             # create request with concordance API
-            entity_task_endpoint = 'https://api.factset.com/content/factset-concordance/v1/entity-task'
+            entity_task_endpoint = 'https://api.factset.com/content/factset-concordance/v2/entity-task'
             entity_task_request = {
+                'universeId': 708,
                 'taskName': self.file_name,
                 'clientIdColumn': 'client_id',
                 'nameColumn': 'Company Name',
@@ -84,7 +83,7 @@ class EntityMatchBulk:
 
     def get_task_status(self, eid, recheck_count: int = 0, max_recheck=12, wait_time=10):
         # get the status of the request
-        entity_task_status_endpoint = 'https://api.factset.com/content/factset-concordance/v1/entity-task-status'
+        entity_task_status_endpoint = 'https://api.factset.com/content/factset-concordance/v2/entity-task-status'
         status_parameters = {
             'taskId': str(eid)
         }
@@ -106,7 +105,7 @@ class EntityMatchBulk:
     def get_entity_decisions(self, eid):
         # get the entity mappings returned from the API
         # seems that the default limit for number of results returned is 100 so increasing to 1000
-        entity_decisions_endpoint = 'https://api.factset.com/content/factset-concordance/v1/entity-decisions'
+        entity_decisions_endpoint = 'https://api.factset.com/content/factset-concordance/v2/entity-decisions'
         decisions_parameters = {
             'taskId': str(eid),
             'limit': 1000
