@@ -62,7 +62,8 @@ class EntityMatchBulk:
             with open(self.file, 'rb') as f:
                 file_data = {'inputFile': (self.file_name + '.csv', f, 'text/csv')}
                 entity_task_response = requests.post(url=entity_task_endpoint, data=entity_task_request,
-                                                     auth=self.authorization, files=file_data, headers=self.headers)
+                                                     auth=self.authorization, files=file_data,
+                                                     headers={'media-type': 'multipart/form-data'})
             assert entity_task_response.ok, f"{entity_task_response.status_code} - {entity_task_response.text}"
             # temporarily saving entity task response to look into errors
             # getting Bad Request - Number of elements in the header doesn't match the total number of columns
