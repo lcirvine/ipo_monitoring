@@ -1,6 +1,5 @@
 import os
 import sys
-import pyodbc
 import pandas as pd
 import numpy as np
 from datetime import date
@@ -22,16 +21,10 @@ class DataComparison:
         self.df_e = self.entity_data()
         self.df_s = self.source_data()
 
-    def return_db_connection(self, db_name: str):
-        return pyodbc.connect(
-            f"Driver={self.config.get(db_name, 'Driver')}"
-            f"Server={self.config.get(db_name, 'Server')}"
-            f"Database={self.config.get(db_name, 'Database')}"
-            f"Trusted_Connection={self.config.get(db_name, 'Trusted_Connection')}",
-            timeout=3)
-
     def pipe_data(self):
-        df = pd.read_sql_query(self.config.get('query', 'peopipe'), self.return_db_connection('termcond'))
+        conn_tc = pg_connection(database='termcond')
+        df = pd.read_sql_query(self.config.get('query', 'peopipe'), conn_tc)
+        conn_tc.close()
         df.drop_duplicates(inplace=True)
         pp_file = os.path.join(self.ref_folder, 'PEO-PIPE IPO Data.xlsx')
         # TODO: read from sql table rather than file
