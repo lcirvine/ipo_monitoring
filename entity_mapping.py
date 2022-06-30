@@ -123,11 +123,11 @@ class EntityMatchBulk:
         df.sort_values(by=['confidenceScore', 'similarityScore'], ascending=False, inplace=True)
         df.replace('', np.nan, inplace=True)
         df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
-        cols = ['clientName', 'entityName', 'iconum', 'entityId', 'matchFlag', 'mapStatus', 'similarityScore',
+        cols = ['clientName', 'entityName', 'iconum', 'entityId', 'mapStatus', 'similarityScore',
                 'confidenceScore', 'countryCode', 'countryName', 'entityTypeCode', 'entityTypeDescription',
-                'nameMatchString', 'nameMatchSource', 'taskId', 'rowIndex', 'clientId', 'company_name', 'Symbol',
-                'Market', 'clientCountry', 'clientState', 'clientUrl']
-        df = df[cols]
+                'nameMatchString', 'taskId', 'rowIndex', 'clientId', 'company_name', 'Symbol',
+                'Market']
+        df = df[[col for col in cols if col in df.columns]]
         df.to_csv(os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '_results.csv'),
                   index=False, encoding='utf-8-sig')
         df.drop_duplicates(subset=['clientName'], inplace=True)
