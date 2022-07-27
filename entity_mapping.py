@@ -99,8 +99,8 @@ class EntityMatchBulk:
         elif task_status == 'FAILURE':
             logger.info(f"Task failed with reason {entity_task_status_data['data'][0]['errorTitle']}")
         else:
-            logger.info(f"Duration for Concordance API {entity_task_status_data['data'][0]['processDuration']}")
-            logger.info(f"Decision Rate for Concordance API {entity_task_status_data['data'][0]['decisionRate']}")
+            logger.info(f"Duration for Concordance API {entity_task_status_data['data'][0].get('processDuration')}")
+            logger.info(f"Decision Rate for Concordance API {round(entity_task_status_data['data'][0].get('decisionRate'), 2)}")
             return task_status
 
     def get_entity_decisions(self, eid):
@@ -118,42 +118,45 @@ class EntityMatchBulk:
         
     def formatting_and_saving(self, df: pd.DataFrame):
         # save results from Concordance API
-        # braking out the client_id back into company name, Symbol and Market columns
+        # breaking out the client_id back into company name, Symbol and Market columns
         df[['company_name', 'Symbol', 'Market']] = df['clientId'].str.split('_', expand=True)
-        df.sort_values(by=['confidenceScore', 'similarityScore'], ascending=False, inplace=True)
         df.replace('', np.nan, inplace=True)
-        df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
-        cols = ['clientName', 'entityName', 'iconum', 'entityId', 'mapStatus', 'similarityScore',
-                'confidenceScore', 'countryCode', 'countryName', 'entityTypeCode', 'entityTypeDescription',
-                'nameMatchString', 'taskId', 'rowIndex', 'clientId', 'company_name', 'Symbol',
-                'Market']
-        df = df[[col for col in cols if col in df.columns]]
-        df.to_csv(os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '_results.csv'),
-                  index=False, encoding='utf-8-sig')
-        df.drop_duplicates(subset=['clientName'], inplace=True)
-        # add results to entity mapping file
-        df.rename(columns={'clientName': 'Company Name', 'entityId': 'entity_id'}, inplace=True)
-        final_cols = ['Company Name', 'Symbol', 'Market', 'entityName', 'iconum', 'entity_id', 'mapStatus',
-                      'similarityScore', 'confidenceScore', 'countryName', 'entityTypeDescription']
-        df = df[final_cols]
-        # rows with confidence below .75 should be not be considered matches
-        df.loc[df['confidenceScore'] <= .75, 'mapStatus'] = 'UNMAPPED'
-        df.loc[df['confidenceScore'] <= .75, ['entityName', 'iconum', 'entity_id', 'similarityScore', 'confidenceScore',
-                                              'countryName', 'entityTypeCode', 'entityTypeDescription']] = np.nan
-        # TODO: read from db table rather than file
-        if os.path.exists(self.entity_mapping_file):
-            df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)
-        df.sort_values(by=['entityName', 'Company Name'], inplace=True)
-        df.drop_duplicates(subset=['Company Name'], inplace=True)
-        df.to_excel(self.entity_mapping_file, index=False, encoding='utf-8-sig')
-        conn = pg_connection()
-        try:
-            df.columns = convert_cols_db(df.columns)
-            df.to_sql('entity_mapping', conn, if_exists='replace', index=False)
-        except Exception as e:
-            logger.error(e, exc_info=sys.exc_info())
-        finally:
-            conn.close()
+        df = df.loc[df['mapStatus'].str.upper() == 'MAPPED']
+        if len(df) > 0:
+            df.sort_values(by=['confidenceScore', 'similarityScore'], ascending=False, inplace=True)
+            # rows with confidence below .75 should be not be considered matches
+            df.loc[df['confidenceScore'] <= .75, 'mapStatus'] = 'UNMAPPED'
+            df.loc[df['confidenceScore'] <= .75, ['entityName', 'iconum', 'entity_id', 'similarityScore',
+                                                  'confidenceScore', 'countryName', 'entityTypeCode',
+                                                  'entityTypeDescription']] = np.nan
+            df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
+            cols = ['clientName', 'entityName', 'iconum', 'entityId', 'mapStatus', 'similarityScore',
+                    'confidenceScore', 'countryCode', 'countryName', 'entityTypeCode', 'entityTypeDescription',
+                    'nameMatchString', 'taskId', 'rowIndex', 'clientId', 'company_name', 'Symbol',
+                    'Market']
+            df = df[[col for col in cols if col in df.columns]]
+            df.to_csv(os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '_results.csv'),
+                      index=False, encoding='utf-8-sig')
+            df.drop_duplicates(subset=['clientName'], inplace=True)
+            # add results to entity mapping file
+            df.rename(columns={'clientName': 'Company Name', 'entityId': 'entity_id'}, inplace=True)
+            final_cols = ['Company Name', 'Symbol', 'Market', 'entityName', 'iconum', 'entity_id', 'mapStatus',
+                          'similarityScore', 'confidenceScore', 'countryName', 'entityTypeDescription']
+            df = df[final_cols]
+            # TODO: read from db table rather than file
+            if os.path.exists(self.entity_mapping_file):
+                df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)
+            df.sort_values(by=['entityName', 'Company Name'], inplace=True)
+            df.drop_duplicates(subset=['Company Name'], inplace=True)
+            df.to_excel(self.entity_mapping_file, index=False, encoding='utf-8-sig')
+            conn = pg_connection()
+            try:
+                df.columns = convert_cols_db(df.columns)
+                df.to_sql('entity_mapping', conn, if_exists='replace', index=False)
+            except Exception as e:
+                logger.error(e, exc_info=sys.exc_info())
+            finally:
+                conn.close()
 
     @staticmethod
     def iconum_to_entity_id(iconum: int):
