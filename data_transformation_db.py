@@ -287,10 +287,9 @@ class DataTransformation:
             df = self.src_dfs.get(source_name).copy()
             df = self.format_date_cols(df, ['subscription_date', 'announcement_of_winning_results', 'ipo_date',
                                             'time_added'])
-            df['company_name'] = df['new_share_name'].str.extract(r'^(\w*)\s')
-            df['ticker'] = df['company_name'].str.extract(r'\w(\d*)\b')
+            df['company_name'] = df['new_share_name'].str.replace(r'(\d*)', '', regex=True)
+            df['ticker'] = df['new_share_name'].str.extract(r'(\d*)$')
             df['ticker'] = df['ticker'].astype(str)
-            df['company_name'] = df['company_name'].str.replace(r'\w(\d*)\b', '', regex=True)
             df['exchange'] = 'Shanghai Stock Exchange'
             tbl = self.sources[source_name]['db_table']
             df.to_sql(tbl, self.conn, if_exists='replace', index=False,
@@ -690,9 +689,8 @@ class DataTransformation:
         self.df_all.reset_index(drop=True, inplace=True)
 
     def save_all(self):
-        # TODO: keep db friendly names once ready to save other files to db
-        # renaming back to original names for now
-        self.df_all.rename(columns={
+        df_all_file = self.df_all.copy()
+        df_all_file.rename(columns={
             'company_name': 'Company Name',
             'ticker': 'Symbol',
             'exchange': 'Market',
@@ -703,8 +701,8 @@ class DataTransformation:
             'notes': 'Notes',
             'time_added': 'time_checked'
         }, inplace=True)
-        self.df_all.drop(columns=['time_removed'], inplace=True)
-        self.df_all.to_excel(self.result_file, sheet_name='All IPOs', index=False, encoding='utf-8-sig',
+        df_all_file.drop(columns=['time_removed'], inplace=True)
+        df_all_file.to_excel(self.result_file, sheet_name='All IPOs', index=False, encoding='utf-8-sig',
                              freeze_panes=(1, 0))
 
     def save_all_db(self):

@@ -213,7 +213,7 @@ website_sources = {
         'table_attrs': {'class': ['table', 'table-hover']},
         'row_elem': 'tr',
         # 'row_attrs': {},
-        'cell_elem': 'td',
+        'cell_elem': ['th','td'],
         # 'cell_attrs': {},
         'header_elem': 'th',
         # 'header_attrs': {},
@@ -232,7 +232,7 @@ website_sources = {
             'announcement_of_winning_results',
             'ipo_date'
         ],
-        'column_names_as_row': False,
+        'column_names_as_row': True,
         'file': 'Shanghai',
         'db_table_raw': 'source_shanghai_raw',
         'db_table': 'source_shanghai'
@@ -739,6 +739,39 @@ website_sources = {
         'file': 'East Money',
         'db_table_raw': 'source_east_money_raw',
         'db_table': 'source_east_money'
+    },
+    'NSE': {
+        'source_type': 'website',
+        'exchange': 'National Stock Exchange of India',
+        'rank': 6,
+        'location': 'Mumbai',
+        'url': 'https://www.nseindia.com/market-data/new-stock-exchange-listings-forthcoming',
+        'table_num': 0,
+        'table_elem': 'table',
+        # 'table_attrs': {'id': 'livenltForthcomingTable', 'class': ['common_table', 'w-100']},
+        'row_elem': 'tr',
+        # 'row_attrs': {'attr_key': 'attr_value'},
+        'cell_elem': 'td',
+        # 'cell_attrs': {'attr_key': 'attr_value'},
+        # 'header_elem': 'th',
+        # 'header_attrs': {'attr_key': 'attr_value'},
+        # 'link_elem': 'a',
+        'columns': [
+            'ipo_date',
+            'type',
+            'ticker',
+            'company_name',
+            'series',
+            'isin',
+            'pre_open_session',
+            'shareholding',
+            'financial_results',
+            'remarks'
+        ],
+        'column_names_as_row': False,
+        'file': 'nse',
+        'db_table_raw': 'source_nse_raw',
+        'db_table': 'source_nse'
     }
 }
 

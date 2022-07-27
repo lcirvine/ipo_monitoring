@@ -12,12 +12,8 @@ from selenium.webdriver.firefox.options import Options
 import pandas as pd
 import numpy as np
 import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-import configparser
 from pg_connection import pg_connection, sql_types
 from collections import defaultdict
-
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class WebDriver:
@@ -38,8 +34,6 @@ class WebDriver:
                 self.sources = json.load(f)
             self.website_sources = {k: v for k, v in self.sources.items() if v['source_type'] == 'website'}
         self.webscraping_results = []
-        self.config = configparser.ConfigParser()
-        self.config.read('api_key.ini')
         self.conn = pg_connection()
 
     @staticmethod
@@ -176,6 +170,11 @@ class WebDriver:
                 # those incorrect dates will be 6+ months away, shouldn't see legitimate IPO dates that far in advance
                 # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
                 df.loc[df['ipo_date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] - pd.offsets.DateOffset(years=1)
+                # at the end of the year, the calendar will show IPOs for next year
+                # adding the current year to that previous date will be incorrect
+                # those incorrect dates will be more than 6 months in the past
+                # if the IPO date is less than 6 months past, I add 1 year to the IPO date
+                df.loc[df['ipo_date'] < (pd.to_datetime('today') - pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] + pd.offsets.DateOffset(years=1)
                 df['exchange'] = 'Japan Stock Exchange' + ' - ' + df['ticker'].str.extract(r'\((\w*)\)')
                 df['ticker'] = df['ticker'].str.replace(r'(\(\w*\))', '', regex=True)
                 df['time_checked'] = self.time_checked_str
