@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 import confuse
 import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import json
 import time
 import os
@@ -11,7 +10,6 @@ import sys
 from io import StringIO
 from logging_ipo_dates import logger
 
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 config = confuse.Configuration('wf_api', __name__)
 config.set_file('config.yaml')
@@ -271,16 +269,19 @@ class GenesysAPI:
                 file_link = bulk_upload_file_response['data']['file_link']
                 is_timedout = timedout_dict[bulk_upload_file_response['data']['is_timedout']]
                 attempt += 1
-                logger.info(f"Attempt {attempt}\n{bulk_upload_file_response}")
+                logger.info(f"Attempt {attempt}\n{bulk_upload_file_response.get('message')}")
                 time.sleep(10)
             if file_link != '':
                 res = requests.get(url=file_link, verify=False)
-                assert res.ok, f"Error when downloading file\n{res.status_code}\n{res.text}"
-                df_res = pd.read_csv(StringIO(res.text))
-                new_tasks = df_res.loc[df_res['message'].str.contains('created successfully'), 'task_id'].tolist()
-                dupe_tasks = df_res.loc[df_res['message'].str.contains('already exists'), 'task_id'].tolist()
-                logger.info(f"{len(new_tasks)} new tasks created: {','.join(new_tasks)}")
-                logger.info(f"{len(dupe_tasks)} duplicate tasks: {','.join(dupe_tasks)}")
+                # if there is an error getting the results of the upload, I don't want the rest of the job to fail
+                if res.ok:
+                    df_res = pd.read_csv(StringIO(res.text))
+                    new_tasks = df_res.loc[df_res['message'].str.contains('created successfully'), 'task_id'].tolist()
+                    dupe_tasks = df_res.loc[df_res['message'].str.contains('already exists'), 'task_id'].tolist()
+                    logger.info(f"{len(new_tasks)} new tasks created: {','.join(new_tasks)}")
+                    logger.info(f"{len(dupe_tasks)} duplicate tasks: {','.join(dupe_tasks)}")
+                else:
+                    logger.error(f"Error when downloading file\n{res.status_code}\n{res.text}")
 
         csv_uuid, bulk_upload_url = get_presigned_url()
         upload_csv_file(bulk_upload_url, file)
