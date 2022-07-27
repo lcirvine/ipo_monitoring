@@ -673,6 +673,20 @@ class DataTransformation:
                   })
         self.append_to_all(df)
 
+    def nse(self):
+        source_name = 'NSE'
+        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        df = self.src_dfs.get(source_name).copy()
+        df = self.format_date_cols(df, ['ipo_date', 'time_added'])
+        tbl = self.sources[source_name]['db_table']
+        df.to_sql(tbl, self.conn, if_exists='replace', index=False,
+                  dtype={
+                      'ipo_date': sql_types.Date,
+                      'time_added': sql_types.DateTime,
+                      'time_removed': sql_types.DateTime,
+                  })
+        self.append_to_all(df)
+
     def formatting_all(self):
         # removing commas from company name - Concordance API will interpret those as new columns
         self.df_all['company_name'] = self.df_all['company_name'].str.replace(',', '', regex=False)
