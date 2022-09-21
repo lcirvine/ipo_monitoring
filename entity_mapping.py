@@ -56,8 +56,7 @@ class EntityMatchBulk:
                 'taskName': self.file_name,
                 'clientIdColumn': 'client_id',
                 'nameColumn': 'Company Name',
-                'includeEntityType': ['PUB', 'PVT', 'HOL', 'SUB'],
-                'uniqueMatch': True
+                'includeEntityType': ['PUB', 'PVT', 'HOL', 'SUB']
             }
             with open(self.file, 'rb') as f:
                 file_data = {'inputFile': (self.file_name + '.csv', f, 'text/csv')}
