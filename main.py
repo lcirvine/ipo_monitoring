@@ -1,4 +1,4 @@
-from logging_ipo_dates import logger, consolidate_webscraping_results
+from logging_ipo_dates import logger  # , consolidate_webscraping_results
 import source_reference
 import website_scraping
 import data_transformation
@@ -18,6 +18,6 @@ entity_mapping.main()
 data_comparison.main()
 workflow.main()
 rpd_creation.main()
-consolidate_webscraping_results()
+# consolidate_webscraping_results()
 file_management.main()
 logger.info('-' * 100)

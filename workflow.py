@@ -277,9 +277,7 @@ class GenesysAPI:
                 if res.ok:
                     df_res = pd.read_csv(StringIO(res.text))
                     new_tasks = df_res.loc[df_res['message'].str.contains('created successfully'), 'task_id'].tolist()
-                    dupe_tasks = df_res.loc[df_res['message'].str.contains('already exists'), 'task_id'].tolist()
-                    logger.info(f"{len(new_tasks)} new tasks created: {','.join(new_tasks)}")
-                    logger.info(f"{len(dupe_tasks)} duplicate tasks: {','.join(dupe_tasks)}")
+                    logger.info(f"{len(new_tasks)} new tasks created: {','.join([str(nt) for nt in new_tasks])}")
                 else:
                     logger.error(f"Error when downloading file\n{res.status_code}\n{res.text}")
 
@@ -308,17 +306,10 @@ class GenesysAPI:
 def main():
     wf_id = config['workflow']['id'].get()  # 15490
     gs = GenesysAPI(content_set='peopipe', user_id=21160, environment='prod')
-    df_tasks_start = gs.task_count(wf_id)
-    num_tasks_start = df_tasks_start['total_tasks'].sum()
-
     df = get_upcoming_ipos()
     wf_upload_file = os.path.join(os.getcwd(), 'temp_ipo_monitoring_upload.csv')
     df.to_csv(wf_upload_file, index=False)
     gs.bulk_upload(wf_id, wf_upload_file)
-
-    df_tasks_end = gs.task_count(wf_id)
-    num_tasks_end = df_tasks_end['total_tasks'].sum()
-    logger.info(f"Difference of {num_tasks_end - num_tasks_start} tasks")
 
 
 if __name__ == '__main__':

@@ -5,6 +5,7 @@ import json
 import time
 from random import randint
 from datetime import datetime
+from typing import Optional, Union, Any
 from logging_ipo_dates import logger, log_folder
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -17,7 +18,7 @@ from collections import defaultdict
 
 
 class WebDriver:
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: bool = True, sources=None):
         opts = Options()
         if headless:
             opts.headless = True
@@ -28,10 +29,13 @@ class WebDriver:
         self.source_data_folder = os.path.join(os.getcwd(), 'Data from Sources')
         if not os.path.exists(self.source_data_folder):
             os.mkdir(self.source_data_folder)
-        sources_file = os.path.join(os.getcwd(), 'sources.json')
-        if os.path.exists(sources_file):
-            with open(sources_file, 'r') as f:
-                self.sources = json.load(f)
+        if sources:
+            self.sources = sources
+        else:
+            sources_file = os.path.join(os.getcwd(), 'sources.json')
+            if os.path.exists(sources_file):
+                with open(sources_file, 'r') as f:
+                    self.sources = json.load(f)
             self.website_sources = {k: v for k, v in self.sources.items() if v['source_type'] == 'website'}
         self.webscraping_results = []
         self.conn = pg_connection()
@@ -62,7 +66,7 @@ class WebDriver:
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         return soup
 
-    def parse_table(self, get_links: bool = False, **kwargs) -> pd.DataFrame:
+    def parse_table(self, get_links: bool = False, **kwargs) -> Union[Optional[pd.DataFrame], Any]:
         """
         Parses the element identified by the keyword arguments and returns a pandas dataframe
         :param get_links: bool, if true the function will add links to data returned
@@ -82,8 +86,11 @@ class WebDriver:
         column_names_as_row = kwargs.get('column_names_as_row')
 
         soup = self.return_soup()
-        if table_title is not None and soup.find(text=table_title) is not None:
-            table = soup.find(text=table_title).parent.parent.find(table_elem)
+        if table_title is not None:
+            if soup.find(text=table_title) is None:
+                return None
+            else:
+                table = soup.find(text=table_title).parent.parent.find(table_elem)
         elif table_attrs is None:
             table = soup.find_all(table_elem)[table_num]
         else:
@@ -416,7 +423,6 @@ def main():
             error_screenshot_file = f"{k} Error {wd.time_checked.strftime('%Y-%m-%d %H%M')}.png"
             wd.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
             wd.webscraping_results.append([wd.time_checked_str, k, 0])
-            pass
     wd.special_cases()
     wd.save_webscraping_results()
     wd.close_down()

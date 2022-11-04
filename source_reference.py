@@ -301,38 +301,6 @@ website_sources = {
         'db_table_raw': 'source_aastocks_raw',
         'db_table': 'source_aastocks'
     },
-    'LSE': {
-        'source_type': 'website',
-        'exchange': 'London Stock Exchange',
-        'rank': 7,
-        'location': 'London',
-        'url': 'https://www.londonstockexchange.com/exchange/prices-and-markets/stocks/new-and-recent-issues/new-recent-issues-home.html',
-        'table_num': 0,
-        'table_elem': 'table',
-        'table_attrs': {'class': 'upcoming-issues'},
-        'row_elem': 'tr',
-        # 'row_attrs': {},
-        'cell_elem': 'td',
-        # 'cell_attrs': {},
-        'header_elem': 'th',
-        # 'header_attrs': {},
-        # 'link_elem': '',
-        # 'link_key': '',
-        'columns': [
-            'company_name',
-            'exchange',
-            'deal_size',
-            'deal_size_secondary',
-            'currency',
-            'price_range',
-            'ipo_date',
-            'security_type'
-        ],
-        'column_names_as_row': False,
-        'file': 'LSE',
-        'db_table_raw': 'source_lse_raw',
-        'db_table': 'source_lse'
-    },
     'CNInfo': {
         'source_type': 'website',
         'exchange': 'Shenzhen Stock Exchange',
@@ -852,6 +820,38 @@ other_sources = {
 }
 
 unused_sources = {
+    'LSE': {
+        'source_type': 'website',
+        'exchange': 'London Stock Exchange',
+        'rank': 7,
+        'location': 'London',
+        'url': 'https://www.londonstockexchange.com/exchange/prices-and-markets/stocks/new-and-recent-issues/new-recent-issues-home.html',
+        'table_num': 0,
+        'table_elem': 'table',
+        'table_attrs': {'class': ['full-width', 'recent-issues', 'swipable-table']},
+        'row_elem': 'tr',
+        # 'row_attrs': {},
+        'cell_elem': 'td',
+        # 'cell_attrs': {},
+        'header_elem': 'th',
+        # 'header_attrs': {},
+        # 'link_elem': '',
+        # 'link_key': '',
+        'columns': [
+            'company_name',
+            'exchange',
+            'deal_size',
+            'deal_size_secondary',
+            'currency',
+            'price_range',
+            'ipo_date',
+            'security_type'
+        ],
+        'column_names_as_row': False,
+        'file': 'LSE',
+        'db_table_raw': 'source_lse_raw',
+        'db_table': 'source_lse'
+    },
     'CNInfo': {
         'source_type': 'website',
         'exchange': ', '.join(['Shanghai Stock Exchange', 'Shenzhen Stock Exchange']),
