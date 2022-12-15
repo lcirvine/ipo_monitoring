@@ -7,7 +7,7 @@ from datetime import datetime
 from time import sleep
 import requests
 from configparser import ConfigParser
-from pg_connection import pg_connection, convert_cols_db
+from pg_connection import pg_connection
 from logging_ipo_dates import logger, error_email, log_folder
 
 pd.options.mode.chained_assignment = None
@@ -27,21 +27,30 @@ class EntityMatchBulk:
         self.headers = {'Content-Type': 'application/json', 'Accept': 'application/json;charset=utf-8'}
 
     def create_csv(self, recheck_all: bool = False):
-        # create a dataframe of all company names without iconums including new names found
-        df_e = pd.read_excel(self.entity_mapping_file, usecols=['Company Name', 'iconum', 'entity_id', 'mapStatus'])
-        df_s = pd.read_excel(os.path.join(os.getcwd(), 'Results', 'All IPOs.xlsx'),
-                             usecols=['Company Name', 'Symbol', 'Market'])
-        df = pd.merge(df_s, df_e, how='outer', on='Company Name')
+        conn = pg_connection('ipo_monitoring')
+        query = """
+        SELECT 
+            ai.company_name, ai.ticker ,ai.exchange, em.iconum, em.entity_id, em.mapStatus
+        FROM 
+            all_ipos ai
+            LEFT JOIN entity_mapping em ON ai.company_name = em.company_name  
+        WHERE 
+            ai.company_name IS NOT NULL 
+            AND em.iconum IS NULL
+            --AND ipo_date >= CURRENT_DATE
+        ORDER BY ai.time_added DESC
+        """
+        df = pd.read_sql_query(query, conn)
         if recheck_all:
-            # checking 1. company names that aren't null 2. don't have an iconum
-            df = df.loc[~df['Company Name'].isna() & df['iconum'].isna()]
+            # checking company names that don't have an iconum
+            df = df.loc[df['iconum'].isna()]
         else:
-            # only checking 1. company names that aren't null 2. don't have an iconum and 3. haven't been checked yet
-            df = df.loc[~df['Company Name'].isna() & df['iconum'].isna() & df['mapStatus'].isna()]
+            # only checking company names that don't have an iconum and haven't been checked yet
+            df = df.loc[df['iconum'].isna() & df['mapStatus'].isna()]
         df = df.drop_duplicates()
         logger.info(f"{len(df)} unmapped entities")
-        # making unique client_id by concatenating company name, symbol and market separated by underscores
-        df['client_id'] = df['Company Name'].fillna('') + '_' + df['Symbol'].fillna('').astype(str) + '_' + df['Market'].fillna('')
+        # making unique client_id by concatenating company name, ticker and exchange separated by underscores
+        df['client_id'] = df['company_name'].fillna('') + '_' + df['ticker'].fillna('').astype(str) + '_' + df['exchange'].fillna('')
         df.set_index('client_id', inplace=True)
         # save that dataframe to a csv encoded as utf8
         if len(df) >= 1:
@@ -55,7 +64,7 @@ class EntityMatchBulk:
                 'universeId': str(708),
                 'taskName': self.file_name,
                 'clientIdColumn': 'client_id',
-                'nameColumn': 'Company Name',
+                'nameColumn': 'company_name',
                 'includeEntityType': ['PUB', 'PVT', 'HOL', 'SUB']
             }
             with open(self.file, 'rb') as f:
@@ -98,8 +107,8 @@ class EntityMatchBulk:
         elif task_status == 'FAILURE':
             logger.info(f"Task failed with reason {entity_task_status_data['data'][0]['errorTitle']}")
         else:
-            logger.info(f"Duration for Concordance API {entity_task_status_data['data'][0].get('processDuration')}")
-            logger.info(f"Decision Rate for Concordance API {round(entity_task_status_data['data'][0].get('decisionRate'), 2)}")
+            logger.info(f"Duration for Concordance API {entity_task_status_data['data'][0].get('processDuration', 0)}")
+            logger.info(f"Decision Rate for Concordance API {round(entity_task_status_data['data'][0].get('decisionRate', 0), 2)}")
             return task_status
 
     def get_entity_decisions(self, eid):
@@ -117,41 +126,38 @@ class EntityMatchBulk:
         
     def formatting_and_saving(self, df: pd.DataFrame):
         # save results from Concordance API
-        # breaking out the client_id back into company name, Symbol and Market columns
-        df[['company_name', 'Symbol', 'Market']] = df['clientId'].str.split('_', expand=True)
+        # breaking out the client_id back into company name, ticker and exchange columns
+        df[['company_name', 'ticker', 'exchange']] = df['clientId'].str.split('_', n=2, expand=True)
         df.replace('', np.nan, inplace=True)
+        # only adding mapped entities to the database
         df = df.loc[df['mapStatus'].str.upper() == 'MAPPED']
         if len(df) > 0:
             df.sort_values(by=['confidenceScore', 'similarityScore'], ascending=False, inplace=True)
+            df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
             # rows with confidence below .75 should be not be considered matches
             df.loc[df['confidenceScore'] <= .75, 'mapStatus'] = 'UNMAPPED'
-            df.loc[df['confidenceScore'] <= .75, ['entityName', 'iconum', 'entity_id', 'similarityScore',
+            df.loc[df['confidenceScore'] <= .75, ['entityName', 'iconum', 'entityId', 'similarityScore',
                                                   'confidenceScore', 'countryName', 'entityTypeCode',
                                                   'entityTypeDescription']] = np.nan
-            df['iconum'] = df['entityId'].map(self.entity_id_to_iconum, na_action='ignore')
             cols = ['clientName', 'entityName', 'iconum', 'entityId', 'mapStatus', 'similarityScore',
                     'confidenceScore', 'countryCode', 'countryName', 'entityTypeCode', 'entityTypeDescription',
-                    'nameMatchString', 'taskId', 'rowIndex', 'clientId', 'company_name', 'Symbol',
-                    'Market']
+                    'nameMatchString', 'taskId', 'rowIndex', 'clientId', 'company_name', 'ticker',
+                    'exchange']
             df = df[[col for col in cols if col in df.columns]]
+            # TODO: do I really need to save the mapping results?
             df.to_csv(os.path.join(self.ref_folder, 'Entity Mapping Requests', self.file_name + '_results.csv'),
                       index=False, encoding='utf-8-sig')
-            df.drop_duplicates(subset=['clientName'], inplace=True)
-            # add results to entity mapping file
-            df.rename(columns={'clientName': 'Company Name', 'entityId': 'entity_id'}, inplace=True)
-            final_cols = ['Company Name', 'Symbol', 'Market', 'entityName', 'iconum', 'entity_id', 'mapStatus',
-                          'similarityScore', 'confidenceScore', 'countryName', 'entityTypeDescription']
+            df.rename(columns={'entityName': 'entityname', 'entityId': 'entity_id', 'mapStatus': 'mapstatus',
+                               'similarityScore': 'similarityscore', 'confidenceScore': 'confidencescore',
+                               'countryName': 'countryname', 'entityTypeDescription': 'entitytypedescription',
+                               'entityTypeCode': 'entitytypecode'}, inplace=True)
+            final_cols = ['company_name', 'ticker', 'exchange', 'entityname', 'iconum', 'entity_id', 'mapstatus',
+                          'similarityscore', 'confidencescore', 'countryname', 'entitytypedescription']
             df = df[final_cols]
-            # TODO: read from db table rather than file
-            if os.path.exists(self.entity_mapping_file):
-                df = pd.concat([df, pd.read_excel(self.entity_mapping_file)], ignore_index=True)
-            df.sort_values(by=['entityName', 'Company Name'], inplace=True)
-            df.drop_duplicates(subset=['Company Name'], inplace=True)
-            df.to_excel(self.entity_mapping_file, index=False, encoding='utf-8-sig')
+            df.drop_duplicates(subset=['company_name'], inplace=True)
             conn = pg_connection()
             try:
-                df.columns = convert_cols_db(df.columns)
-                df.to_sql('entity_mapping', conn, if_exists='replace', index=False)
+                df.to_sql('entity_mapping', conn, if_exists='append', index=False)
             except Exception as e:
                 logger.error(e, exc_info=sys.exc_info())
             finally:
