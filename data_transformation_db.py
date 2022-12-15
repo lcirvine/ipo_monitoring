@@ -52,7 +52,7 @@ class DataTransformation:
 
         def nyse():
             source_name = 'NYSE'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df_up = self.src_dfs.get(source_name).copy()
             df_up = self.format_date_cols(df_up, ['ipo_date', 'time_added'])
             # NYSE provides the expected pricing date, the expected listing date is one day after
@@ -70,7 +70,7 @@ class DataTransformation:
                          })
 
             source_name = 'NYSE Withdrawn'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df_wd = self.src_dfs.get(source_name).copy()
             df_wd = self.format_date_cols(df_wd, ['postponement_date', 'time_added'])
             df_wd['notes'] = 'Withdrawn on ' + df_wd['postponement_date'].astype(str)
@@ -90,7 +90,7 @@ class DataTransformation:
 
         def nasdaq():
             source_name = 'Nasdaq'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df_up = self.src_dfs.get(source_name).copy()
             df_up = self.format_date_cols(df_up, ['ipo_date', 'time_added'])
             df_up.loc[df_up['price'].str.contains('-', na=False), 'price_range'] = df_up['price']
@@ -109,21 +109,21 @@ class DataTransformation:
                          })
 
             source_name = 'Nasdaq Priced'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df_p = self.src_dfs.get(source_name).copy()
             df_p = self.format_date_cols(df_p, ['ipo_date', 'time_added'])
             df_p['shares_offered'] = df_p['shares_offered'].str.replace(',', '').astype(int, errors='ignore')
             tbl = self.sources[source_name]['db_table']
-            df_up.to_sql(tbl, self.conn, if_exists='replace', index=False,
-                         dtype={
-                             'ipo_date': sql_types.Date,
-                             'time_added': sql_types.DateTime,
-                             'time_removed': sql_types.DateTime,
-                             'shares_offered': sql_types.Float
-                         })
+            df_p.to_sql(tbl, self.conn, if_exists='replace', index=False,
+                        dtype={
+                            'ipo_date': sql_types.Date,
+                            'time_added': sql_types.DateTime,
+                            'time_removed': sql_types.DateTime,
+                            'shares_offered': sql_types.Float
+                        })
 
             source_name = 'Nasdaq Withdrawn'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df_wd = self.src_dfs.get(source_name).copy()
             df_wd = self.format_date_cols(df_wd, ['announcement_date', 'cancellation_date', 'time_added'])
             df_wd['notes'] = 'Withdrawn on ' + df_wd['cancellation_date'].astype(str)
@@ -145,7 +145,7 @@ class DataTransformation:
 
         def iposcoop():
             source_name = 'IPOScoop'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df = self.src_dfs.get(source_name).copy()
             df['status'] = df['ipo_date'].str.extract(r'(Priced|Postponed)')
             # dropping 'week of' dates because they're just not accurate enough
@@ -158,7 +158,8 @@ class DataTransformation:
             df.loc[df['price_range_low'] == df['price_range_high'], 'price'] = df['price_range_high']
             df['price'] = pd.to_numeric(df['price'], errors='coerce')
             df['exchange'] = 'IPOScoop'
-            df['shares_offered'] = df['shares_offered_mm'].astype(int, errors='ignore') * 1000000
+            df['shares_offered'] = pd.to_numeric(df['shares_offered_mm'], errors='ignore')
+            df['shares_offered'] = df['shares_offered'] * 1000000
             tbl = self.sources[source_name]['db_table']
             df.to_sql(tbl, self.conn, if_exists='replace', index=False,
                       dtype={
@@ -172,7 +173,7 @@ class DataTransformation:
 
         def av():
             source_name = 'AlphaVantage'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df = self.src_dfs.get(source_name).copy()
             df = self.format_date_cols(df, ['ipo_date', 'time_added'])
             df.loc[(df['price_range_low'] != df['price_range_high']) &
@@ -181,12 +182,20 @@ class DataTransformation:
             df.loc[(df['price_range_low'] == df['price_range_high']) & (df['price_range_low'] != 0), 'price'] = df[
                 'price_range_high']
             df['price'] = pd.to_numeric(df['price'], errors='coerce')
-            # When listing an ETF, warrants or rights both price high and price low will be 0. Those should be dropped.
-            # However, direct listings will also have price high and low at 0.
-            # TODO: keep only direct listings but drop all other rows where price high and low both equal 0
-            # The problem is that when units split into shares and warrants, those will also have 0 as price range
-            # and the asset type will still be shares. Those should be dropped as well.
-            df.drop(df.loc[(df['price_range_low'] == 0) & (df['price_range_high'] == 0)].index, inplace=True)
+            # exchange names sometimes have triple quotes around them i.e. """NYSE American"""
+            df['exchange'] = df['exchange'].str.replace('"', '')
+            # assetTypes given are Units, Shares, Warrants, Rights - adding ETFs
+            df.loc[df['company_name'].str.contains(' ETF'), 'assetType'] = 'ETF'
+            # Warrants, Rights, and ETFs will have price_range_low and price_range_high = 0
+            # Shares where price_range_low and price_range_high = 0 are either direct listings or splitting SPAC units
+            # saving all assetTypes (including warrants, rights, ETFs) because symbology would like to have them
+            # removing asset types from company name
+            asset_text = [' ETF Trust', ' ETF', ' Units', ' Unit', ' Warrants to purchase ', ' Warrants', ' Warrant', ' Rights'
+                          ' Class A Common Stock', ' Class A Ordinary Shares', ' Class A Ordinary Share',
+                          ' Subordinate Voting Shares', ' American Depository Shares', ' American Depositary Shares',
+                          ' Common Stock', ' Common Shares', ' Ordinary Shares']
+            for att in asset_text:
+                df['company_name'] = df['company_name'].str.replace(att, '', case=False, regex=False)
             tbl = self.sources[source_name]['db_table']
             df.to_sql(tbl, self.conn, if_exists='replace', index=False,
                       dtype={
@@ -201,7 +210,7 @@ class DataTransformation:
         df_nd = nasdaq()
         df_is = iposcoop()
         df_av = av()
-        df = pd.concat([df_ny, df_nd], ignore_index=True, sort=False)
+        df = pd.concat([df_nd, df_ny], ignore_index=True, sort=False)
 
         # Add iposcoop and av only when there is not already a row from one of the exchanges
         # company names are often different so joining on symbol after removing special characters
@@ -231,7 +240,7 @@ class DataTransformation:
 
     def jpx(self):
         source_name = 'JPX'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df_jp = self.src_dfs.get(source_name).copy()
         df_jp = self.format_date_cols(df_jp, ['ipo_date', 'date_of_listing_approval', 'time_added'])
         df_jp['exchange'] = 'Japan Stock Exchange - ' + df_jp['market_segment']
@@ -249,7 +258,7 @@ class DataTransformation:
                      })
 
         source_name = 'TokyoIPO'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df_tk = self.src_dfs.get(source_name).copy()
         df_tk = self.format_date_cols(df_tk, ['ipo_date', 'time_added'])
         df_tk.loc[df_tk['price_range_expected_date'].notna(), 'notes'] = 'Price Range expected ' + df_tk[
@@ -283,7 +292,7 @@ class DataTransformation:
 
         def shanghai():
             source_name = 'Shanghai'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df = self.src_dfs.get(source_name).copy()
             df = self.format_date_cols(df, ['subscription_date', 'announcement_of_winning_results', 'ipo_date',
                                             'time_added'])
@@ -304,12 +313,13 @@ class DataTransformation:
 
         def cninfo():
             source_name = 'CNInfo'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df = self.src_dfs.get(source_name).copy()
             df = self.format_date_cols(df, ['ipo_date', 'release_date', 'time_added'])
             df['exchange'] = 'Shenzhen Stock Exchange'
             df['ticker'] = df['ticker'].astype(str)
-            df['shares_offered'] = pd.to_numeric(df['shares_offered'], errors='coerce') * 10000
+            df['shares_offered'] = pd.to_numeric(df['shares_offered'], errors='coerce')
+            df['shares_offered'] = df['shares_offered'] * 10000
             tbl = self.sources[source_name]['db_table']
             df.to_sql(tbl, self.conn, if_exists='replace', index=False,
                       dtype={
@@ -323,14 +333,14 @@ class DataTransformation:
 
         def eastmoney():
             source_name = 'East Money'
-            assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+            assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
             df = self.src_dfs.get(source_name).copy()
             df.replace('-', np.nan, inplace=True)
             df = self.format_date_cols(df, ['time_added'])
             df['ticker'] = df['ticker'].astype(str)
             # date is provided as mm-dd, adding current year to make the date formatted as mm-dd-yyyy
             df['ipo_date'] = df['ipo_date'] + f"-{datetime.now().year}"
-            df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
+            df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce')
             # at the beginning of the year, the calendar will still show IPOs from last year
             # adding the current year to that previous date will be incorrect
             # those incorrect dates will be 6+ months away, we shouldn't see legitimate IPO dates that far in advance
@@ -360,7 +370,7 @@ class DataTransformation:
 
     def euronext(self):
         source_name = 'Euronext'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date'], dayfirst=True)
         df = self.format_date_cols(df, ['time_added'])
@@ -376,7 +386,7 @@ class DataTransformation:
 
     def aastocks(self):
         source_name = 'AAStocks'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['exchange'] = 'Hong Kong Stock Exchange'
@@ -397,7 +407,7 @@ class DataTransformation:
 
     def lse(self):
         source_name = 'LSE'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['company_name'] = df['company_name'].str.replace(r'\s\(.*\)', '', regex=True)
@@ -413,9 +423,11 @@ class DataTransformation:
 
     def tmx(self):
         source_name = 'TMX'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df.rename(columns={'list_symbol': 'ticker', 'effective_date': 'ipo_date', 'details': 'notes'}, inplace=True)
+        # notes (renamed from details) can be really long, truncating to 200 characters
+        df['notes'] = df['notes'].str[:200]
         latest = df.loc[(df['file'].str[:8] == df['file'].max()[:8]), 'identification'].to_list()
         df.loc[(~df['identification'].isin(latest) & df['time_removed'].isna()), 'time_removed'] = self.time_checked_str
         df.sort_values(by=['entry_date', 'file', 'time_added'], inplace=True)
@@ -441,7 +453,7 @@ class DataTransformation:
 
     def frankfurt(self):
         source_name = 'Frankfurt'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df.fillna(np.nan, inplace=True)
@@ -471,7 +483,7 @@ class DataTransformation:
 
     def krx(self):
         source_name = 'KRX'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['ticker'] = df['ticker'].astype(str)
@@ -492,7 +504,7 @@ class DataTransformation:
 
     def asx(self):
         source_name = 'ASX'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df.sort_values(by=['time_added'], inplace=True)
         df.drop_duplicates(subset=[col for col in df.columns if 'time' not in col], inplace=True)
@@ -507,7 +519,7 @@ class DataTransformation:
 
     def twse(self):
         source_name = 'TWSE'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['announcement_date', 'listing_review_date', 'application_approval_date',
                                         'listing_agreement_submitted_to_fsc_date', 'ipo_date', 'time_added'])
@@ -528,7 +540,7 @@ class DataTransformation:
 
     def bme(self):
         source_name = 'BME'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         for c in ['shares_offered', 'deal_size', 'volume']:
@@ -552,7 +564,7 @@ class DataTransformation:
 
     def sgx(self):
         source_name = 'SGX'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['exchange'] = 'Singapore Exchange - ' + df['market_segment'].fillna('')
@@ -573,7 +585,7 @@ class DataTransformation:
 
     def idx(self):
         source_name = 'IDX'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'delisting_date', 'time_added'])
         df['exchange'] = 'Indonesia Stock Exchange - ' + df['market_segment'].fillna('')
@@ -588,7 +600,7 @@ class DataTransformation:
 
     def bm(self):
         source_name = 'BM'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['subscription_date_start', 'subscription_date_end', 'ipo_date', 'time_added'])
         df['exchange'] = 'Bursa Malaysia - ' + df['market_segment'].fillna('')
@@ -606,7 +618,7 @@ class DataTransformation:
 
     def nasdaqnordic(self):
         source_name = 'NasdaqNordic'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['exchange'] = 'Nasdaq Nordic'
@@ -627,7 +639,7 @@ class DataTransformation:
 
     def spotlight(self):
         source_name = 'SpotlightAPI'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         df['exchange'] = 'Spotlight'
@@ -642,7 +654,7 @@ class DataTransformation:
 
     def italy(self):
         source_name = 'BIT'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date'], dayfirst=True)
         df = self.format_date_cols(df, ['time_added'])
@@ -660,7 +672,7 @@ class DataTransformation:
 
     def ipohub(self):
         source_name = 'IPOHub'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         tbl = self.sources[source_name]['db_table']
@@ -675,7 +687,7 @@ class DataTransformation:
 
     def nse(self):
         source_name = 'NSE'
-        assert source_name in self.src_dfs.keys(), f"No CSV file for {source_name} in Source Data folder."
+        assert source_name in self.src_dfs.keys(), f"No source data for {source_name}."
         df = self.src_dfs.get(source_name).copy()
         df = self.format_date_cols(df, ['ipo_date', 'time_added'])
         tbl = self.sources[source_name]['db_table']
@@ -695,7 +707,6 @@ class DataTransformation:
             'status'].fillna('')
         self.df_all.loc[self.df_all['ipo_date'].dt.date == date.today(), 'status'] = 'Listing Today'
         self.df_all['status'] = self.df_all['status'].str.strip()
-        self.df_all['ipo_date'] = self.df_all['ipo_date'].dt.strftime('%Y-%m-%d')
         self.df_all['price'] = pd.to_numeric(self.df_all['price'], errors='coerce')
         self.df_all.sort_values(by='time_added', ascending=False, inplace=True)
         self.df_all.drop_duplicates(subset=['company_name', 'exchange'], inplace=True)
@@ -716,8 +727,7 @@ class DataTransformation:
             'time_added': 'time_checked'
         }, inplace=True)
         df_all_file.drop(columns=['time_removed'], inplace=True)
-        df_all_file.to_excel(self.result_file, sheet_name='All IPOs', index=False, encoding='utf-8-sig',
-                             freeze_panes=(1, 0))
+        df_all_file.to_excel(self.result_file, sheet_name='All IPOs', index=False, freeze_panes=(1, 0))
 
     def save_all_db(self):
         self.df_all.to_sql('all_ipos', self.conn, if_exists='replace', index=False,
@@ -741,7 +751,7 @@ def main():
         dt.cn()
         dt.euronext()
         dt.aastocks()
-        dt.lse()
+        # dt.lse()
         dt.tmx()
         dt.frankfurt()
         dt.krx()
