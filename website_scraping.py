@@ -1,6 +1,5 @@
 import os
 import sys
-import csv
 import json
 import time
 from random import randint
@@ -25,10 +24,6 @@ class WebDriver:
         self.driver = webdriver.Firefox(options=opts)
         self.sleep_time = 5
         self.time_checked = datetime.utcnow()
-        self.time_checked_str = self.time_checked.strftime('%Y-%m-%d %H:%M')
-        self.source_data_folder = os.path.join(os.getcwd(), 'Data from Sources')
-        if not os.path.exists(self.source_data_folder):
-            os.mkdir(self.source_data_folder)
         if sources:
             self.sources = sources
         else:
@@ -37,7 +32,6 @@ class WebDriver:
                 with open(sources_file, 'r') as f:
                     self.sources = json.load(f)
             self.website_sources = {k: v for k, v in self.sources.items() if v['source_type'] == 'website'}
-        self.webscraping_results = []
         self.conn = pg_connection()
 
     @staticmethod
@@ -118,7 +112,7 @@ class WebDriver:
             # Some sources give the column headers as rows in the table
             if column_names_as_row:
                 df = df.drop(0).reset_index(drop=True)
-            df['time_checked'] = self.time_checked_str
+            df['time_checked'] = self.time_checked
             return df
 
     def special_cases(self):
@@ -128,14 +122,14 @@ class WebDriver:
                 url = self.sources['ASX'].get('url')
                 self.driver.get(url)
                 soup = self.return_soup()
-                listing_info = [co.text.strip() for co in soup.find_all('span', attrs={'class': 'gtm-accordion'})]
+                listing_info = [co.text.strip() for co in soup.find_all('h6', attrs={'class': 'gtm-accordion'})]
                 df = pd.DataFrame(listing_info)
                 df.columns = ['listing_info']
                 df['company_name'] = df['listing_info'].str.extract(r'^([a-zA-Z0-9\s,\.&\(\)\-]*)\s\-')
                 df['ipo_date'] = df['listing_info'].str.extract(r'\s*-\s*(\d{1,2}\s\w*\s\d{2,4})')
-                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
+                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce')
                 df['exchange'] = 'Australian Stock Exchange'
-                df['time_checked'] = self.time_checked_str
+                df['time_checked'] = self.time_checked
                 return df
             except Exception as e:
                 logger.error(f"ERROR for ASX")
@@ -171,20 +165,13 @@ class WebDriver:
                 df['price'] = pd.to_numeric(df['price'].str.replace(',', ''), errors='coerce')
                 # date is provided as mm/dd, adding current year to make the date formatted as mm/dd/yyyy
                 df['ipo_date'] = df['ipo_date'] + f"/{datetime.now().year}"
-                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce').dt.date
-                # at the beginning of the year, the calendar will still show IPOs from last year
-                # adding the current year to that previous date will be incorrect
-                # those incorrect dates will be 6+ months away, shouldn't see legitimate IPO dates that far in advance
-                # if the IPO date is more than 6 months away, I subtract 1 year from the IPO date
-                df.loc[df['ipo_date'] > (pd.to_datetime('today') + pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] - pd.offsets.DateOffset(years=1)
-                # at the end of the year, the calendar will show IPOs for next year
-                # adding the current year to that previous date will be incorrect
-                # those incorrect dates will be more than 6 months in the past
-                # if the IPO date is less than 6 months past, I add 1 year to the IPO date
-                df.loc[df['ipo_date'] < (pd.to_datetime('today') - pd.offsets.DateOffset(months=6)), 'ipo_date'] = df['ipo_date'] + pd.offsets.DateOffset(years=1)
+                df['ipo_date'] = pd.to_datetime(df['ipo_date'], errors='coerce')
+                # TODO: Check end of year/beginning of year to see how to update the year, maybe use diff?
+                # df['ipo_date_diff'] = df['ipo_date'].diff()
+                # df.loc[abs(df['ipo_date_diff']) >= timedelta(days=60)]
                 df['exchange'] = 'Japan Stock Exchange' + ' - ' + df['ticker'].str.extract(r'\((\w*)\)')
                 df['ticker'] = df['ticker'].str.replace(r'(\(\w*\))', '', regex=True)
-                df['time_checked'] = self.time_checked_str
+                df['time_checked'] = self.time_checked
                 return df
             except Exception as e:
                 logger.error(f"ERROR for TokyoIPO")
@@ -208,7 +195,7 @@ class WebDriver:
                         df['assetType'].fillna('Shares', inplace=True)
                         for c in ['priceRangeLow', 'priceRangeHigh']:
                             df[c] = pd.to_numeric(df[c], errors='coerce')
-                        df['time_checked'] = self.time_checked_str
+                        df['time_checked'] = self.time_checked
                         df.sort_values(by=['ipoDate', 'name'], inplace=True)
                         df.rename(columns={
                             'symbol': 'ticker',
@@ -243,7 +230,7 @@ class WebDriver:
                         'ListingDate': 'ipo_date',
                         'CompanyName': 'company_name',
                         'EmissionDescriptionEnglish': 'listing_type'}, inplace=True)
-                    df['time_checked'] = self.time_checked_str
+                    df['time_checked'] = self.time_checked
                     return df
             except Exception as e:
                 logger.error(f"ERROR for SpotlightAPI")
@@ -284,7 +271,7 @@ class WebDriver:
                 df.loc[df['price'].str.contains('-', na=False), 'price_range'] = df['price']
                 df['currency'] = df['price'].str.extract(r"\s(\w{3})")
                 df['price'] = pd.to_numeric(df['price'].str.replace(r"(\s\w{3})", '', regex=True), errors='coerce')
-                df['time_checked'] = self.time_checked_str
+                df['time_checked'] = self.time_checked
                 return df
             except Exception as e:
                 logger.error(f"ERROR for IPOHub")
@@ -301,100 +288,32 @@ class WebDriver:
         for src, df in special_case_dict.items():
             try:
                 if df is not None:
-                    s_file = os.path.join(self.source_data_folder, self.sources[src].get('file') + '.csv')
-                    if os.path.exists(s_file):
-                        df = self.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
-                    df.sort_values(by='time_checked', ascending=False, inplace=True)
-                    df.to_csv(s_file, index=False, encoding='utf-8-sig')
                     self.update_table(df, self.sources[src].get('db_table_raw'))
-                    self.webscraping_results.append([self.time_checked_str, src, 1])
-                else:
-                    self.webscraping_results.append([self.time_checked_str, src, 0])
             except Exception as e:
                 logger.error(e, exc_info=sys.exc_info())
-
-    @staticmethod
-    def update_existing_data(old_df: pd.DataFrame, new_df: pd.DataFrame, exclude_col=None) -> pd.DataFrame:
-        """
-        If there is already existing data, this function can be called to remove any duplicates.
-        :param old_df: DataFrame with existing data
-        :param new_df: DataFrame with new data
-        :param exclude_col: Column(s) that will be excluded when removing duplicate values in DataFrames.
-                            Can be given either as a list of columns or a string with the column name.
-        :return: DataFrame
-        """
-        try:
-            df = pd.concat([old_df, new_df.astype(old_df.dtypes)], ignore_index=True, sort=False)
-        except KeyError as ke:
-            logger.error(ke)
-            logger.info(f"Existing df columns: {', '.join(old_df.columns)}")
-            logger.info(f"New df columns: {', '.join(new_df.columns)}")
-        except ValueError as ve:
-            logger.error(ve)
-            logger.info(f"Existing df data types: \n{old_df.dtypes.to_string(na_rep='')}")
-            logger.info(f"New df data types: \n{new_df.dtypes.to_string(na_rep='')}")
-            df = pd.concat([old_df, new_df], ignore_index=True, sort=False)
-        if exclude_col and isinstance(exclude_col, str):
-            ss = [col for col in df.columns.to_list() if col != exclude_col]
-        elif exclude_col and isinstance(exclude_col, list):
-            ss = [col for col in df.columns.to_list() if col not in exclude_col]
-        else:
-            ss = df.columns.to_list()
-        # I want to preserve when this item was first added to the website and have most recent updates at the top so
-        # sorting by most recent time_checked, dropping duplicates for subset of columns and keeping the last (earliest)
-        if 'time_checked' in df.columns:
-            df['time_checked'] = pd.to_datetime(df['time_checked'], errors='coerce')
-            df.sort_values(by='time_checked', ascending=False, inplace=True)
-        df.drop_duplicates(subset=ss, keep='last', inplace=True)
-        return df
 
     def update_table(self, df_new: pd.DataFrame, source_table: str):
         df = df_new.copy()
         try:
-            df_s = pd.read_sql_table(source_table, self.conn)
-            for col in ['time_checked']:
-                if col in df.columns:
-                    df[col] = pd.to_datetime(df[col].fillna(pd.NaT), errors='coerce')
-            for col in df.columns:
-                if col in df_s.columns:
-                    df[col] = df[col].astype(df_s[col].dtype.name)
+            df_s = pd.read_sql_table(source_table, self.conn, parse_dates=['time_added', 'time_removed'])
             merge_cols = [c for c in df.columns if c not in ('time_checked', 'time_added', 'time_removed')]
-            df_m = pd.merge(df_s, df, how='outer', on=merge_cols, suffixes=('', '_'), indicator=True)
+            df_m = pd.merge(left=df_s, right=df, how='outer', on=merge_cols, suffixes=('', '_drop'), indicator=True)
             df_m['time_added'].fillna(df_m['time_checked'], inplace=True)
             df_m.loc[
                 (df_m['_merge'] == 'left_only')
-                & (df_m['time_removed'].isna()), 'time_removed'] = self.time_checked_str
-            df_m.drop(columns=['_merge', 'time_checked'], inplace=True)
+                & (df_m['time_removed'].isna()), 'time_removed'] = self.time_checked
+            drop_cols = [c for c in ('_merge', 'time_checked', 'time_added_drop', 'time_removed_drop') if c in df_m.columns]
+            df_m.drop(columns=drop_cols, inplace=True)
         except ValueError:
             # if the table doesn't exist in the db, it will throw a value error
             df_m = df.rename(columns={'time_checked': 'time_added'})
             df_m['time_removed'] = pd.NaT
-        for col in ['time_added', 'time_removed']:
-            if col in df_m.columns:
-                df_m[col] = pd.to_datetime(df_m[col].fillna(pd.NaT), errors='coerce')
         df_m.sort_values(by='time_added', inplace=True)
         df_m.to_sql(source_table, self.conn, if_exists='replace', index=False, dtype={
             'time_added': sql_types.DateTime,
             'time_removed': sql_types.DateTime
         })
         # logger.info(f"Table {source_table} updated")
-
-    def save_webscraping_results(self):
-        """
-        Creates a CSV file to log if webscraping was successful for each source
-        :return: None
-        """
-        ws_results_file = os.path.join('Logs', 'Webscraping Results.csv')
-        with open(ws_results_file, 'a+', newline='') as f:
-            writer = csv.writer(f)
-            for r in self.webscraping_results:
-                writer.writerow(r)
-        try:
-            df_wr = pd.DataFrame(self.webscraping_results)
-            df_wr.columns = ['time_checked', 'source', 'result']
-            df_wr.to_sql('webscraping_results', self.conn, if_exists='append', index=False)
-        except Exception as e:
-            logger.error(e, exc_info=sys.exc_info())
 
     def close_down(self):
         self.driver.close()
@@ -411,20 +330,12 @@ def main():
             df = wd.parse_table(**v)
             if df is not None:
                 wd.update_table(df, v.get('db_table_raw'))
-                s_file = os.path.join(wd.source_data_folder, v.get('file') + '.csv')
-                if os.path.exists(s_file):
-                    df = wd.update_existing_data(pd.read_csv(s_file), df, exclude_col='time_checked')
-                df.sort_values(by='time_checked', ascending=False, inplace=True)
-                df.to_csv(s_file, index=False, encoding='utf-8-sig')
-                wd.webscraping_results.append([wd.time_checked_str, k, 1])
         except Exception as e:
             logger.error(f"ERROR for {k}")
             logger.error(e, exc_info=sys.exc_info())
-            error_screenshot_file = f"{k} Error {wd.time_checked.strftime('%Y-%m-%d %H%M')}.png"
+            error_screenshot_file = f"{k} Error {wd.time_checked.isoformat()}.png"
             wd.driver.save_screenshot(os.path.join(log_folder, 'Screenshots', error_screenshot_file))
-            wd.webscraping_results.append([wd.time_checked_str, k, 0])
     wd.special_cases()
-    wd.save_webscraping_results()
     wd.close_down()
 
 
