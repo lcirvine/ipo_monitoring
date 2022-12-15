@@ -23,7 +23,42 @@ class DataComparison:
     def pipe_data(self):
         date_cols = ['announcement_date', 'pricing_date', 'trading_date', 'closing_date', 'last_updated_date_utc']
         conn_tc = pg_connection(database='termcond')
-        df_new = pd.read_sql_query(self.config.get('query', 'peopipe'), conn_tc, parse_dates=date_cols)
+        tc_query = """
+        SELECT 
+            md.iconum
+            ,agnt.as_reported_name AS company_name
+            ,md.id AS master_deal
+            ,ms.cusip::TEXT AS cusip
+            ,CONCAT(md.id::TEXT, '.NI') AS client_deal_id
+            ,secl.ticker::TEXT
+            ,ex.description as exchange
+            ,secis.offering_price as price
+            ,secis.min_offering_price
+            ,secis.max_offering_price
+            ,secdt.announcement_date
+            ,secdt.pricing_date
+            ,secdt.trading_date
+            ,secdt.closing_date
+            ,lps.description as deal_status
+            ,dl.last_updated_date_utc
+        FROM
+            pipe.v_tc_pipe_deal dl
+            INNER JOIN pipe.tc_pipe_master_deal md ON dl.master_deal = md.id
+            INNER JOIN pipe.tc_pipe_deal_issuer dlisr ON dl.id = dlisr.deal
+            INNER JOIN pipe.tc_pipe_deal_agent dlagnt ON dlisr.pipe_agent = dlagnt.id
+            INNER JOIN dbo.tc_agents agnt ON dlagnt.agent = agnt.agent_id
+            INNER JOIN pipe.tc_pipe_security sec ON dl.id = sec.deal
+            INNER JOIN pipe.tc_pipe_security_details secd ON sec.id = secd.security AND secd.ipo_flag = 1
+            INNER JOIN pipe.tc_pipe_master_security ms ON sec.master_security = ms.id
+            INNER JOIN pipe.tc_pipe_security_dates secdt ON sec.id = secdt.security
+            LEFT JOIN pipe.tc_pipe_security_listing secl ON sec.id = secl.security
+            INNER JOIN pipe.tc_pipe_security_issuance_subscription secis ON sec.id = secis.security
+            INNER JOIN pipe.tc_pipe_lookup_placement_status lps ON secd.placement_status = lps.id
+            LEFT JOIN dbo.SecmasExchanges ex ON secl.exchange = ex.exchange_code
+        WHERE
+            dl.rn = 1
+            AND dl.last_updated_date_utc > (CURRENT_DATE - INTERVAL '7 day')"""
+        df_new = pd.read_sql_query(tc_query, conn_tc, parse_dates=date_cols)
         conn_tc.close()
         df_existing = pd.read_sql_table('peo_pipe', self.conn, coerce_float=False, parse_dates=date_cols)
         df = pd.concat((df_existing, df_new), ignore_index=True, sort=False)
@@ -104,6 +139,7 @@ class DataComparison:
                             suffixes=('_external', '_fds'))
         for col in ['ipo_date', 'trading_date']:
             df_outer[col] = pd.to_datetime(df_outer[col], errors='coerce')
+        # TODO: is this error still happening?
         # sometimes I get this error Reindexing only valid with uniquely valued Index objects
         # probably due to this bug https://github.com/pandas-dev/pandas/issues/39882
         # should be fixed in v 1.3, but leaving comments for reference https://github.com/pandas-dev/pandas/milestone/80
@@ -111,11 +147,13 @@ class DataComparison:
             (df_outer['ipo_date'].dt.date >= date.today())
             | (df_outer['trading_date'].dt.date >= date.today())
         ]
-        df_ipo.to_excel(os.path.join(self.ref_folder, 'IPO Monitoring Data.xlsx'), index=False, encoding='utf-8-sig')
+        # TODO: save this data to the database
+        df_ipo.to_excel(os.path.join(self.ref_folder, 'IPO Monitoring Data.xlsx'), index=False)
         df_wd = df_outer.loc[df_outer['status'] == 'Withdrawn']
-        df_wd.to_excel(os.path.join(self.ref_folder, 'Withdrawn IPOs.xlsx'), index=False, encoding='utf-8-sig')
+        df_wd.to_excel(os.path.join(self.ref_folder, 'Withdrawn IPOs.xlsx'), index=False)
 
     def compare(self):
+        # no longer needed, leaving method but not calling it
         df_m = pd.merge(self.merge_entity_data(), self.df_pp, how='left', on='iconum', suffixes=('_external', '_fds'))
         df_m.drop_duplicates(inplace=True)
         for c in [col for col in df_m.columns if 'date' in col.lower()]:
@@ -147,7 +185,6 @@ def main():
     try:
         dc.concatenate_ticker_exchange()
         dc.file_for_rpds()
-        dc.compare()
     except Exception as e:
         logger.error(e, exc_info=sys.exc_info())
         error_email(str(e))
