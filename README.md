@@ -1,7 +1,7 @@
 # IPO Monitoring #
 This project was created to monitor IPOs from various sources, compare the data to what has already been collected in the PEO-PIPE database, create RPDs for Symbology for all upcoming IPOs and email a report with the results.
 
-![IPO Monitoring Overview](images\IPO Monitoring Overview.drawio.png)
+![IPO Monitoring Overview](https://github.factset.com/lirvine/ipo_monitoring/blob/master/Images/IPO%20Monitoring%20Overview.drawio.png)
 
 ## What it Does ##
 
