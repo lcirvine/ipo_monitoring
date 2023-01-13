@@ -18,6 +18,7 @@ class RPDCreation:
     def __init__(self):
         self.config = configparser.ConfigParser()
         self.config.read('api_key.ini')
+        # TODO: this needs a general overhaul where you're not reading from files
         self.source_file = os.path.join('Reference', 'IPO Monitoring Data.xlsx')
         self.result_file = os.path.join(os.getcwd(), 'Reference', 'IPO Monitoring RPDs.xlsx')
         self.wd_file = os.path.join(os.getcwd(), 'Reference', 'Withdrawn IPOs.xlsx')
@@ -371,7 +372,7 @@ class RPDCreation:
                            'RPD Link',
                            'RPD Creation Date',
                            'RPD Status']]
-        self.df.to_excel(self.result_file, index=False, encoding='utf-8-sig')
+        self.df.to_excel(self.result_file, index=False)
         conn = pg_connection()
         try:
             self.df.columns = convert_cols_db(self.df.columns)
