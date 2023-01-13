@@ -19,6 +19,5 @@ Data from Sources/
 Backfill/
 Reference/
 Results/
-Images/
+**/__pycache__/**
 rpd_creation_test.py
-!resources/schedule.csv.csv
