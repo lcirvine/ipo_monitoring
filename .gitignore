@@ -1,0 +1,24 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+*.ini
+*.iml
+*.xlsx
+*.csv
+*.bat
+*.log
+*.json
+*.sql
+*.yaml
+*.toml
+*.zip
+.idea/
+No Longer Needed/
+Logs/
+Data from Sources/
+Backfill/
+Reference/
+Results/
+Images/
+rpd_creation_test.py
+!resources/schedule.csv.csv
